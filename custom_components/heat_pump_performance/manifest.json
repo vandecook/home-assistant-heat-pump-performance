@@ -1,0 +1,12 @@
+{
+  "domain": "heat_pump_performance",
+  "name": "Heat Pump Performance",
+  "codeowners": [],
+  "config_flow": true,
+  "documentation": "https://github.com/vandecook/home-assistant-heat-pump-performance",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "requirements": [],
+  "version": "0.1.13",
+  "issue_tracker": "https://github.com/vandecook/home-assistant-heat-pump-performance/issues"
+}

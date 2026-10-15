@@ -1,0 +1,111 @@
+{
+  "title": "Heat Pump Performance",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Wärmepumpensystem",
+        "description": "Quell-Entitäten auswählen. Für numerische Eingänge können Sensor-, input_number- und number-Entitäten auch ohne Home-Assistant-Energiemetadaten verwendet werden.",
+        "data": {
+          "name": "Anlagenname / Präfix",
+          "system_type": "Systemtyp",
+          "thermal_energy": "Thermische Energie *",
+          "electrical_energy": "Elektrische Energie gesamte Anlage *",
+          "electrical_power": "Elektrische Leistung gesamte Anlage",
+          "aux_energy": "Elektrische Energie Steuerung und Wohnraumlüftung",
+          "aux_power": "Elektrische Leistung Steuerung und Wohnraumlüftung",
+          "heating_active": "Heizbetrieb aktiv",
+          "dhw_active": "Warmwasseraufbereitung aktiv"
+        }
+      },
+      "units": {
+        "title": "Einheiten",
+        "description": "Einheiten explizit festlegen. Dadurch können auch Sensoren ohne Einheit in Home Assistant verwendet werden.",
+        "data": {
+          "thermal_energy_unit": "Einheit thermische Energie",
+          "electrical_energy_unit": "Einheit elektrische Energie",
+          "electrical_power_unit": "Einheit elektrische Leistung",
+          "aux_energy_unit": "Einheit Hilfsenergie",
+          "aux_power_unit": "Einheit Hilfsleistung"
+        }
+      },
+      "periods": {
+        "title": "Zeiträume",
+        "description": "Die Auswahl des Jahresstarts gilt nur beim erstmaligen Einrichten dieser Instanz. Folgende Kalenderjahre starten automatisch am 1. Januar.",
+        "data": {
+          "initial_year_mode": "Startpunkt der ersten Jahresarbeitszahl",
+          "initial_year_date": "Startdatum für Teiljahr",
+          "heating_season_enabled": "Heizperioden-Arbeitszahl aktivieren",
+          "heating_season_start": "Beginn Heizperiode (MM-TT)",
+          "heating_season_end": "Ende Heizperiode (MM-TT)",
+          "max_thermal_power_kw": "Maximale thermische Leistung (kW)",
+          "thermal_safety_factor": "Sicherheitsfaktor",
+          "thermal_resolution_kwh": "Zählerauflösung / Toleranz (kWh)"
+        }
+      }
+    },
+    "error": {
+      "date_required": "Für Teiljahr muss ein Startdatum gewählt werden.",
+      "invalid_mm_dd": "Format MM-TT verwenden, z. B. 10-01."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Heat Pump Performance Optionen",
+        "data": {
+          "name": "Anlagenname / Präfix",
+          "heating_season_enabled": "Heizperioden-Arbeitszahl aktivieren",
+          "heating_season_start": "Beginn Heizperiode (MM-TT)",
+          "heating_season_end": "Ende Heizperiode (MM-TT)"
+        },
+        "description": "Quell-Entitäten ändern. Für numerische Eingänge können Sensor-, input_number- und number-Entitäten verwendet werden. Beim Wechsel einer Energiequelle wird dieser Eingang neu referenziert; bereits aufsummierte Periodenwerte bleiben erhalten."
+      }
+    }
+  },
+  "selector": {
+    "system_type": {
+      "options": {
+        "hp": "Wärmepumpe / Kompaktanlage",
+        "dhw_hp": "Brauchwasser-Wärmepumpe"
+      }
+    },
+    "year_mode": {
+      "options": {
+        "from_now": "Ab jetzt",
+        "full_year": "Gesamtes Jahr ab 1. Januar (wenn Recorder-Historie verfügbar)",
+        "partial_year": "Teiljahr ab gewähltem Datum"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "working_ratio": {
+        "name": "Arbeitszahl"
+      },
+      "working_ratio_daily": {
+        "name": "Arbeitszahl täglich"
+      },
+      "working_ratio_monthly": {
+        "name": "Arbeitszahl monatlich"
+      },
+      "working_ratio_yearly": {
+        "name": "Jahresarbeitszahl"
+      },
+      "working_ratio_heating_season": {
+        "name": "Heizperioden-Arbeitszahl"
+      },
+      "working_ratio_lifetime": {
+        "name": "Arbeitszahl Gesamtzeit"
+      },
+      "thermal_energy": {
+        "name": "Wärmeenergie"
+      },
+      "electrical_energy": {
+        "name": "Elektrische Energie"
+      },
+      "input_diagnostics": {
+        "name": "Eingangsdiagnose"
+      }
+    }
+  }
+}
