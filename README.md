@@ -1,5 +1,7 @@
 # Heat Pump Performance
 
+**Current version: 0.1.14**
+
 Repository: https://github.com/vandecook/home-assistant-heat-pump-performance
 
 Issues: https://github.com/vandecook/home-assistant-heat-pump-performance/issues
@@ -197,6 +199,20 @@ data:
 Inspect preview, then run with `confirm: true`. Resets all internal period buckets, previous day/month, initial-year backfill, and rebases input counters at current readings. Set `reset_spikes: true` to also reset spike count. Config entries and entity IDs remain unchanged. A backup is saved. **Recorder history and statistics are not deleted or rewritten.** After reset, the yearly period is intentionally a partial year beginning at reset time; the following January starts a new year. The sensor history will show a new value, not an erased past.
 
 **Safety:** back up Home Assistant before applying a repair or reset. A Home Assistant runtime integration test is still required.
+
+## v0.1.14: Hassfest and HACS validation fixes
+
+This release updates integration metadata and documentation only. **There are no changes to the energy calculations, spike filter, persisted balances, or entity IDs.**
+
+- Added `custom_components/heat_pump_performance/services.yaml` with field descriptions for `repair_thermal_balance` and `reset_history`, as required by Hassfest for registered actions.
+- Declared the optional Recorder integration initialization order via `after_dependencies: ["recorder"]` in `manifest.json`.
+- Added `custom_components/heat_pump_performance/brand/icon.png` for HACS brand validation.
+- Sorted `manifest.json` keys in Hassfest order: `domain`, `name`, followed by all remaining keys alphabetically.
+- Updated documentation to match version `0.1.14`.
+
+The release is intended to resolve the reported Hassfest `SERVICES`, `DEPENDENCIES`, and `MANIFEST` findings and the HACS brands check. **Final validation must still be confirmed by running the GitHub Actions workflow.**
+
+The `actions/checkout@v4` Node.js deprecation warning and runner-image migration notices belong to the GitHub Actions environment and are separate from the integration changes.
 
 ## Maintenance actions
 
