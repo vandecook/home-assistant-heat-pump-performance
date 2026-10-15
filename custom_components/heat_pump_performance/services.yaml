@@ -1,0 +1,58 @@
+repair_thermal_balance:
+  name: Repair thermal balance
+  description: Correct thermal energy in affected balance periods. Preview first with confirm false.
+  fields:
+    entry_id:
+      name: Config entry ID
+      description: Use config_entry_id('sensor.your_entity') in Developer Tools > Templates.
+      required: true
+      example: "0123456789abcdef0123456789abcdef"
+      selector:
+        text:
+    affected_at:
+      name: Error timestamp
+      description: Date and time when the invalid energy was recorded (ISO 8601 with timezone).
+      required: true
+      example: "2026-10-12T03:52:10+02:00"
+      selector:
+        text:
+    correction_kwh:
+      name: Thermal energy correction
+      description: Thermal energy to subtract, in kWh.
+      required: true
+      example: 1000
+      selector:
+        number:
+          min: 0.000001
+          step: any
+          mode: box
+    confirm:
+      name: Apply correction
+      description: False previews only; true saves a backup and applies the correction.
+      required: false
+      default: false
+      selector:
+        boolean:
+reset_history:
+  name: Reset internal balance history
+  description: Reset stored balance buckets for one integration instance. Recorder history is not deleted.
+  fields:
+    entry_id:
+      name: Config entry ID
+      description: Use config_entry_id('sensor.your_entity') in Developer Tools > Templates.
+      required: true
+      selector:
+        text:
+    reset_spikes:
+      name: Reset rejected-spike counter
+      required: false
+      default: false
+      selector:
+        boolean:
+    confirm:
+      name: Apply reset
+      description: False previews only; true saves a backup and resets the internal balance.
+      required: false
+      default: false
+      selector:
+        boolean:

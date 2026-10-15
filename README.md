@@ -197,3 +197,36 @@ data:
 Inspect preview, then run with `confirm: true`. Resets all internal period buckets, previous day/month, initial-year backfill, and rebases input counters at current readings. Set `reset_spikes: true` to also reset spike count. Config entries and entity IDs remain unchanged. A backup is saved. **Recorder history and statistics are not deleted or rewritten.** After reset, the yearly period is intentionally a partial year beginning at reset time; the following January starts a new year. The sensor history will show a new value, not an erased past.
 
 **Safety:** back up Home Assistant before applying a repair or reset. A Home Assistant runtime integration test is still required.
+
+## Maintenance actions
+
+Find the config entry ID using **Developer Tools > Templates**:
+
+```jinja2
+{{ config_entry_id('sensor.lwz303_hp_spf_lifetime') }}
+```
+
+Use **Developer Tools > Actions** to preview a thermal correction:
+
+```yaml
+action: heat_pump_performance.repair_thermal_balance
+data:
+  entry_id: YOUR_CONFIG_ENTRY_ID
+  affected_at: "2026-10-12T03:52:10+02:00"
+  correction_kwh: 1000
+  confirm: false
+```
+
+Only set `confirm: true` after checking the preview. The `1000` is an example, not a recommended correction.
+
+Preview a reset of **internal** history (does not delete Home Assistant Recorder data):
+
+```yaml
+action: heat_pump_performance.reset_history
+data:
+  entry_id: YOUR_CONFIG_ENTRY_ID
+  reset_spikes: false
+  confirm: false
+```
+
+After reviewing the preview, set `confirm: true` to apply. The integration saves a backup of its state first.
