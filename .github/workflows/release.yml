@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate and package
+        env:
+          GIT_REF_TYPE: ${{ github.ref_type }}
+          GIT_REF_NAME: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+          import py_compile
+          import zipfile
+
+          root = pathlib.Path('custom_components/heat_pump_performance')
+          manifest = root / 'manifest.json'
+          if not manifest.is_file():
+              raise SystemExit('Missing integration manifest')
+          for path in root.rglob('*.py'):
+              py_compile.compile(str(path), doraise=True)
+          for path in root.rglob('*.json'):
+              json.loads(path.read_text(encoding='utf-8'))
+          version = json.loads(manifest.read_text(encoding='utf-8'))['version']
+          ref_type = os.environ['GIT_REF_TYPE']
+          ref_name = os.environ['GIT_REF_NAME']
+          if ref_type != 'tag':
+              raise SystemExit('Releases require a version tag, e.g. v0.1.13')
+          if ref_name != 'v' + version:
+              raise SystemExit(f'Tag {ref_name} does not match manifest version {version}')
+          archive = pathlib.Path(f'heat_pump_performance_{ref_name}.zip')
+          with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as z:
+              for path in root.rglob('*'):
+                  if path.is_file() and '__pycache__' not in path.parts and path.suffix != '.pyc':
+                      z.write(path, path.relative_to(root))
+          print(f'Created {archive}')
+          PY
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            "heat_pump_performance_${GITHUB_REF_NAME}.zip" \
+            --title "Heat Pump Performance ${GITHUB_REF_NAME}" \
+            --generate-notes \
+            --verify-tag
