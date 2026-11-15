@@ -59,6 +59,9 @@ DEFROST_SHARE_WARN_PCT = 25.0
 COP_MIN_PLAUSIBLE = 0.8
 COP_MAX_PLAUSIBLE = 8.0
 COP_MIN_ENERGY_KWH = 2.0
+DEFROST_FLAG_GRACE_S = 120.0
+DEFROST_FLAG_MIN_CYCLES = 5
+DEFROST_FLAG_MISMATCH_WARN_PCT = 50.0
 
 
 def flow_to_m3h(value: float, unit: str) -> float:
@@ -256,6 +259,7 @@ def assess_health(
     meter_deviation: float | None,
     defrost_share: float | None,
     cop_gross_status: str | None,
+    extra_warnings: list[str] | None = None,
 ) -> tuple[str, list[str]]:
     """Derive ``(state, warnings)`` with state in inactive/ok/warning/error."""
     if not configured:
@@ -274,6 +278,7 @@ def assess_health(
         warnings.append(f"defrost_share_high:{defrost_share:.1f}%")
     if cop_gross_status in ("too_high", "too_low"):
         warnings.append(f"cop_{cop_gross_status}")
+    warnings.extend(extra_warnings or [])
     if error:
         return "error", warnings
     return ("warning" if warnings else "ok"), warnings
@@ -380,6 +385,110 @@ class DefrostDetector:
             self._below_since = None
             self._cycle_started = None
         return started
+
+
+class DefrostFlagTracker:
+    """Compare an optional "defrost active" signal of the heat pump with the
+    defrost detected from negative thermal power.
+
+    The flag never changes how energy is booked (that always follows the sign of
+    the power); it is a cross check. Per flagged cycle it is noted whether the
+    water temperatures showed the defrost (power below the threshold while the
+    flag was on, or shortly after it went off). Detected cycles that start without
+    the flag are counted as well.
+    """
+
+    def __init__(self, threshold_kw: float = 0.3, grace_s: float = DEFROST_FLAG_GRACE_S) -> None:
+        self.threshold_kw = threshold_kw
+        self.grace_s = grace_s
+        self.flag_on = False
+        self.flag_cycles = 0
+        self.flag_duration_s = 0.0
+        self.confirmed = 0
+        self.unconfirmed = 0
+        self.detected_without_flag = 0
+        self._cycle_start: float | None = None
+        self._seen_negative = False
+        self._last_off_ts: float | None = None
+        self._last_unconfirmed = False
+
+    def seed(self, ts: float, on: bool) -> None:
+        """Take over the current flag state at startup without counting a cycle."""
+        self.flag_on = on
+        self._cycle_start = ts if on else None
+        self._seen_negative = False
+
+    def flag_changed(self, ts: float, on: bool) -> None:
+        if on and not self.flag_on:
+            self.flag_on = True
+            self.flag_cycles += 1
+            self._cycle_start = ts
+            self._seen_negative = False
+        elif not on and self.flag_on:
+            self.flag_on = False
+            if self._cycle_start is not None:
+                self.flag_duration_s += max(0.0, ts - self._cycle_start)
+            if self._seen_negative:
+                self.confirmed += 1
+                self._last_unconfirmed = False
+            else:
+                self.unconfirmed += 1
+                self._last_unconfirmed = True
+            self._cycle_start = None
+            self._last_off_ts = ts
+
+    def power_sample(self, ts: float, power_kw: float | None, cycle_started: bool) -> None:
+        negative = power_kw is not None and power_kw <= -self.threshold_kw
+        if self.flag_on:
+            if negative:
+                self._seen_negative = True
+            return
+        in_grace = self._last_off_ts is not None and ts - self._last_off_ts <= self.grace_s
+        if negative and in_grace and self._last_unconfirmed:
+            # The temperatures reacted a little after the flag went off.
+            self.unconfirmed = max(0, self.unconfirmed - 1)
+            self.confirmed += 1
+            self._last_unconfirmed = False
+        if cycle_started and not in_grace:
+            self.detected_without_flag += 1
+
+    def warnings(self) -> list[str]:
+        out: list[str] = []
+        if self.flag_cycles >= DEFROST_FLAG_MIN_CYCLES:
+            share = self.unconfirmed / self.flag_cycles * 100.0
+            if share > DEFROST_FLAG_MISMATCH_WARN_PCT:
+                out.append(f"defrost_flag_without_negative_power:{share:.0f}%")
+        total = self.flag_cycles + self.detected_without_flag
+        if total >= DEFROST_FLAG_MIN_CYCLES:
+            share = self.detected_without_flag / total * 100.0
+            if share > DEFROST_FLAG_MISMATCH_WARN_PCT:
+                out.append(f"negative_power_without_defrost_flag:{share:.0f}%")
+        return out
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "active": self.flag_on,
+            "cycles": self.flag_cycles,
+            "duration_s_total": round(self.flag_duration_s, 1),
+            "confirmed_by_temperatures": self.confirmed,
+            "not_seen_in_temperatures": self.unconfirmed,
+            "detected_without_flag": self.detected_without_flag,
+        }
+
+    def restore(self, raw: dict[str, Any] | None) -> None:
+        raw = raw or {}
+        self.flag_cycles = int(raw.get("cycles", 0) or 0)
+        self.flag_duration_s = float(raw.get("duration_s_total", 0.0) or 0.0)
+        self.confirmed = int(raw.get("confirmed_by_temperatures", 0) or 0)
+        self.unconfirmed = int(raw.get("not_seen_in_temperatures", 0) or 0)
+        self.detected_without_flag = int(raw.get("detected_without_flag", 0) or 0)
+
+    def reset(self) -> None:
+        self.flag_cycles = 0
+        self.flag_duration_s = 0.0
+        self.confirmed = 0
+        self.unconfirmed = 0
+        self.detected_without_flag = 0
 
 
 def reference_cop(outdoor_c: float, points: tuple[tuple[float, float], ...]) -> float | None:

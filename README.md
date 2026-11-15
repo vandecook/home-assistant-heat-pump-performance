@@ -44,6 +44,7 @@ All input entities and units can be changed later in the options flow.
 | Electrical energy, controls and ventilation (cumulative) | no | net COP (subtracted from the total) |
 | Electrical power, complete system / controls | no | stored for later; the working ratio uses the energy counters |
 | Heating active / domestic hot water active | no | split into heating and DHW |
+| Defrost active | no | optional cross check of the detected defrost, see [docs/defrost.md](docs/defrost.md) |
 | Flow rate (m³/h, l/min, l/h) | no* | calculated heat |
 | Supply (flow) temperature | no* | calculated heat |
 | Return temperature | no* | calculated heat |
@@ -80,6 +81,27 @@ usually the more accurate figure. The comparison between both is shown in the
 diagnostics, so you can decide on your own data. Recommended: start with `meter`,
 watch the plausibility entity for a few days, then switch.
 
+### Comparing heat meter and calculation
+
+Three sensors show how far the heat meter and the calculation are apart
+(positive = the meter shows more heat than the calculation):
+
+| Sensor | Compares |
+| --- | --- |
+| `…_meter_deviation_daily` | today's meter energy with today's calculated heat |
+| `…_meter_deviation` | meter and calculation over the windows in which both were booked for the *same* time span (lifetime); this is the figure behind the plausibility warning |
+| `…_calc_thermal_energy_daily` | the calculated heat of today, for a side-by-side tile next to `…_thermal_energy_daily` |
+
+Things to keep in mind:
+
+- `…_calc_thermal_energy` is a **lifetime total** and never resets. Do not compare
+  it with the daily meter value; use the `_daily` sensors.
+- Both deviation sensors stay *unknown* below 10 kWh of calculated heat, because
+  a meter that counts in whole kWh says little over smaller amounts.
+- A deviation above 10 % raises a warning in `…_plausibility`.
+- Over a few days differences of 1 to 2 % are normal for a 1 kWh meter. Judge the
+  trend over several days, not a single value.
+
 ## Working ratios
 
 - **Net** working ratio: effective thermal energy divided by the electrical
@@ -112,11 +134,31 @@ domestic hot water, so they are not directly comparable to a test-bench figure.
 
 ## Defrost
 
+See [docs/defrost.md](docs/defrost.md) for the full explanation.
+
 During a defrost the heat pump takes heat out of the heating water, so supply
 drops below return and the power becomes **negative**. This is real energy, not a
 sensor error. It is booked separately as *defrost loss* instead of being clipped
 to zero. A cycle is detected after the power stayed below −0.3 kW for at least
 20 s.
+
+### Optional "Defrost active" input
+
+If your heat pump reports when it defrosts, select that entity (`binary_sensor`,
+`switch`, `input_boolean`, …) as **Defrost active**. It is a cross check only: the
+energy is still booked from the sign of the calculated power, so the signal never
+changes the working ratio.
+
+- Each flagged cycle is checked against the water temperatures (power below −0.3 kW
+  while the flag is on or within 2 minutes after it went off).
+- Cycles seen in the temperatures without the flag are counted too.
+- The counters are in the attribute `defrost.flag` of `…_plausibility`. With at least
+  5 cycles the entity warns when more than half of the flagged cycles are not seen in
+  the temperatures, or more than half of all cycles start without the flag.
+- A flag that is on all the time (for example an "ice monitoring" state) shows up as a
+  warning, so check what your entity really means.
+
+Details: [docs/defrost.md](docs/defrost.md).
 
 ## Plausibility checks and diagnostics
 
@@ -172,7 +214,10 @@ existing entity ID after a rename; the `unique_id` is based on the config entry)
 | `…_cop_heating`, `…_cop_dhw`, `…_spf_heating_yearly`, `…_spf_dhw_yearly` | heating / DHW split |
 | `…_thermal_energy`, `…_electrical_energy` and `_daily` variants | accumulated energy |
 | `…_calc_thermal_power` | signed thermal power in kW |
-| `…_calc_thermal_energy` | calculated delivered heat |
+| `…_calc_thermal_energy` | calculated delivered heat (lifetime total, never resets) |
+| `…_calc_thermal_energy_daily` | calculated delivered heat of today |
+| `…_meter_deviation` | heat meter vs. calculation in %, over the windows in which both were booked for the same time span (needs ≥ 10 kWh) |
+| `…_meter_deviation_daily` | today's heat meter energy vs. today's calculated heat in % (needs ≥ 10 kWh) |
 | `…_defrost_energy`, `…_defrost_count` | calculated defrost loss and detected cycles |
 | `…_cop_reference` | manufacturer COP at the current outdoor temperature (valid for 35 °C flow) |
 | `…_spike_count` | rejected heat meter spikes |

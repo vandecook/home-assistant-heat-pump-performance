@@ -45,6 +45,7 @@ und Einheiten lassen sich später in den Optionen ändern.
 | Elektrische Energie, Steuerung und Lüftung (kumuliert) | nein | Netto-COP (wird vom Gesamtwert abgezogen) |
 | Elektrische Leistung, Gesamtsystem / Steuerung | nein | für später gespeichert; die Arbeitszahl nutzt die Energiezähler |
 | Heizen aktiv / Warmwasser aktiv | nein | Aufteilung in Heizen und Warmwasser |
+| Abtauen aktiv | nein | optionale Gegenprüfung der erkannten Abtauvorgänge, siehe [docs/defrost.de.md](docs/defrost.de.md) |
 | Durchfluss (m³/h, l/min, l/h) | nein* | berechnete Wärme |
 | Vorlauftemperatur | nein* | berechnete Wärme |
 | Rücklauftemperatur | nein* | berechnete Wärme |
@@ -83,6 +84,29 @@ Werte steht in der Diagnose, damit du auf Basis deiner eigenen Daten entscheiden
 kannst. Empfehlung: mit `meter` starten, die Plausibilitäts-Entität einige Tage
 beobachten und dann umstellen.
 
+### Vergleich Wärmemengenzähler und Berechnung
+
+Drei Sensoren zeigen, wie weit Wärmemengenzähler und Berechnung auseinanderliegen
+(positiv = der Zähler zeigt mehr Wärme als die Berechnung):
+
+| Sensor | Vergleicht |
+| --- | --- |
+| `…_meter_deviation_daily` | Zählerenergie von heute mit der berechneten Wärme von heute |
+| `…_meter_deviation` | Zähler und Berechnung über die Fenster, in denen beide für *denselben* Zeitraum gebucht wurden (Gesamtzeit); das ist der Wert hinter der Plausibilitätswarnung |
+| `…_calc_thermal_energy_daily` | die berechnete Wärme von heute, für eine Kachel neben `…_thermal_energy_daily` |
+
+Gut zu wissen:
+
+- `…_calc_thermal_energy` ist eine **Gesamtsumme** und wird nie zurückgesetzt.
+  Vergleiche sie nicht mit dem Tageswert des Zählers, sondern nimm die
+  `_daily`-Sensoren.
+- Beide Abweichungs-Sensoren bleiben *unbekannt*, solange weniger als 10 kWh
+  berechnete Wärme vorliegen, weil ein Zähler in ganzen kWh über kleinere Mengen
+  wenig aussagt.
+- Eine Abweichung über 10 % löst eine Warnung in `…_plausibility` aus.
+- Über wenige Tage sind 1 bis 2 % Unterschied bei einem 1-kWh-Zähler normal.
+  Beurteile den Verlauf über mehrere Tage, nicht einen einzelnen Wert.
+
 ## Arbeitszahlen
 
 - **Netto**-Arbeitszahl: effektive Wärmeenergie geteilt durch die elektrische
@@ -118,11 +142,32 @@ vergleichbar.
 
 ## Abtauen
 
+Ausführliche Erklärung: [docs/defrost.de.md](docs/defrost.de.md).
+
 Beim Abtauen entzieht die Wärmepumpe dem Heizwasser Wärme. Der Vorlauf fällt dann
 unter den Rücklauf, und die Leistung wird **negativ**. Das ist echte Energie und
 kein Sensorfehler. Sie wird als *Abtauverlust* getrennt gebucht und nicht auf null
 begrenzt. Ein Abtauvorgang wird erkannt, wenn die Leistung mindestens 20 s lang
 unter −0,3 kW liegt.
+
+### Optionaler Eingang „Abtauen aktiv"
+
+Meldet deine Wärmepumpe, wann sie abtaut, wähle diese Entität (`binary_sensor`,
+`switch`, `input_boolean`, …) als **Abtauen aktiv** aus. Das ist nur eine
+Gegenprüfung: Die Energie wird weiterhin nach dem Vorzeichen der berechneten Leistung
+gebucht, das Signal ändert die Arbeitszahl also nie.
+
+- Jeder gemeldete Vorgang wird mit den Wassertemperaturen verglichen (Leistung unter
+  −0,3 kW, solange das Signal an ist oder bis 2 Minuten danach).
+- Vorgänge, die in den Temperaturen ohne Signal zu sehen sind, werden ebenfalls gezählt.
+- Die Zähler stehen im Attribut `defrost.flag` von `…_plausibility`. Ab 5 Vorgängen
+  warnt die Entität, wenn mehr als die Hälfte der gemeldeten Vorgänge in den
+  Temperaturen nicht zu sehen ist oder mehr als die Hälfte aller Vorgänge ohne Signal
+  beginnt.
+- Ein Signal, das dauernd an ist (zum Beispiel eine „Eisüberwachung"), zeigt sich als
+  Warnung. Prüfe also, was deine Entität wirklich bedeutet.
+
+Details: [docs/defrost.de.md](docs/defrost.de.md).
 
 ## Plausibilitätsprüfungen und Diagnose
 
@@ -181,7 +226,10 @@ der Config-Entry-ID):
 | `…_cop_heating`, `…_cop_dhw`, `…_spf_heating_yearly`, `…_spf_dhw_yearly` | Aufteilung Heizen / Warmwasser |
 | `…_thermal_energy`, `…_electrical_energy` und `_daily`-Varianten | aufsummierte Energie |
 | `…_calc_thermal_power` | vorzeichenbehaftete Wärmeleistung in kW |
-| `…_calc_thermal_energy` | berechnete gelieferte Wärme |
+| `…_calc_thermal_energy` | berechnete gelieferte Wärme (Gesamtsumme, wird nie zurückgesetzt) |
+| `…_calc_thermal_energy_daily` | berechnete gelieferte Wärme von heute |
+| `…_meter_deviation` | Wärmemengenzähler gegen Berechnung in %, über die Fenster, in denen beide für denselben Zeitraum gebucht wurden (ab 10 kWh) |
+| `…_meter_deviation_daily` | Zähler-Wärme von heute gegen berechnete Wärme von heute in % (ab 10 kWh) |
 | `…_defrost_energy`, `…_defrost_count` | berechneter Abtauverlust und erkannte Vorgänge |
 | `…_cop_reference` | Hersteller-COP bei der aktuellen Außentemperatur (gilt für 35 °C Vorlauf) |
 | `…_spike_count` | verworfene Ausreißer des Wärmemengenzählers |

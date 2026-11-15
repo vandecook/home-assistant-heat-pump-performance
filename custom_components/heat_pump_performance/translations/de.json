@@ -15,6 +15,7 @@
           "aux_power": "Elektrische Leistung Steuerung und Wohnraumlüftung",
           "heating_active": "Heizbetrieb aktiv",
           "dhw_active": "Warmwasseraufbereitung aktiv",
+          "defrost_active": "Abtauen aktiv (optional, nur zur Gegenprüfung der erkannten Abtauvorgänge)",
           "flow_rate": "Durchfluss Heizkreis",
           "supply_temp": "Vorlauftemperatur",
           "return_temp": "Rücklauftemperatur",

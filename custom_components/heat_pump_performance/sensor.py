@@ -36,6 +36,7 @@ from .const import (
     DOMAIN,
     YEAR_FULL,
 )
+from .calc import METER_DEVIATION_MIN_KWH, meter_deviation_pct
 from .runtime import Bucket, HeatPumpPerformanceRuntime
 
 
@@ -102,6 +103,9 @@ async def async_setup_entry(
                 HeatPumpCalcPowerSensor(entry, runtime),
                 HeatPumpCalcEnergySensor(entry, runtime, "calc_heat", "calc_thermal_energy", "Berechnete Wärmeenergie"),
                 HeatPumpCalcEnergySensor(entry, runtime, "calc_loss", "defrost_energy", "Abtau-Energieverlust"),
+                HeatPumpDailyEnergySensor(entry, runtime, "calc_heat", "calc_thermal_energy_daily", "Berechnete Wärmeenergie heute"),
+                HeatPumpDeviationSensor(entry, runtime, "paired", "meter_deviation", "Abweichung Zähler/Berechnung"),
+                HeatPumpDeviationSensor(entry, runtime, "daily", "meter_deviation_daily", "Abweichung Zähler/Berechnung heute"),
                 HeatPumpDefrostCountSensor(entry, runtime),
                 HeatPumpPlausibilitySensor(entry, runtime),
             ]
@@ -390,6 +394,55 @@ class HeatPumpCalcEnergySensor(HeatPumpBaseSensor):
     @property
     def native_value(self):
         return round(getattr(self.runtime.bucket("lifetime"), self.attribute), 3)
+
+
+class HeatPumpDeviationSensor(HeatPumpBaseSensor):
+    """Deviation of the heat meter from the calculated heat in percent.
+
+    ``paired``: only over the windows in which both values were booked for the
+    same time span (lifetime, the figure used for the plausibility warning).
+    ``daily``: today's meter energy against today's calculated heat.
+    Positive means the meter shows more heat than the calculation. Unknown until
+    at least METER_DEVIATION_MIN_KWH of calculated heat is available.
+    """
+
+    _attr_native_unit_of_measurement = "%"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_suggested_display_precision = 1
+    _attr_icon = "mdi:scale-unbalanced"
+
+    def __init__(self, entry, runtime, mode, key, name):
+        super().__init__(entry, runtime, key)
+        self.mode = mode
+        self._attr_name = name
+
+    @property
+    def native_value(self):
+        if self.mode == "daily":
+            bucket = self.runtime.bucket("daily")
+            value = meter_deviation_pct(bucket.thermal, bucket.calc_heat)
+        else:
+            state = self.runtime.state
+            value = meter_deviation_pct(state.cmp_meter_kwh, state.cmp_calc_kwh)
+        return None if value is None else round(value, 2)
+
+    @property
+    def extra_state_attributes(self):
+        if self.mode == "daily":
+            bucket = self.runtime.bucket("daily")
+            return {
+                "meter_kwh": round(bucket.thermal, 3),
+                "calculated_kwh": round(bucket.calc_heat, 3),
+                "period_start": bucket.start,
+                "minimum_kwh": METER_DEVIATION_MIN_KWH,
+            }
+        state = self.runtime.state
+        return {
+            "meter_kwh": round(state.cmp_meter_kwh, 3),
+            "calculated_kwh": round(state.cmp_calc_kwh, 3),
+            "minimum_kwh": METER_DEVIATION_MIN_KWH,
+        }
 
 
 class HeatPumpDefrostCountSensor(HeatPumpBaseSensor):
