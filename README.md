@@ -139,7 +139,8 @@ See [docs/defrost.md](docs/defrost.md) for the full explanation.
 During a defrost the heat pump takes heat out of the heating water, so supply
 drops below return and the power becomes **negative**. This is real energy, not a
 sensor error. It is booked separately as *defrost loss* instead of being clipped
-to zero. A cycle is detected after the power stayed below −0.3 kW for at least
+to zero. A cycle is detected after supply stayed below return by more than
+0.5 K (setting *Defrost: supply below return by more than*) for at least
 20 s.
 
 ### Optional "Defrost active" input
@@ -149,8 +150,9 @@ If your heat pump reports when it defrosts, select that entity (`binary_sensor`,
 energy is still booked from the sign of the calculated power, so the signal never
 changes the working ratio.
 
-- Each flagged cycle is checked against the water temperatures (power below −0.3 kW
-  while the flag is on or within 2 minutes after it went off).
+- Each flagged cycle is checked against the water temperatures (supply below return
+  by more than the defrost threshold while the flag is on or within 2 minutes after
+  it went off).
 - Cycles seen in the temperatures without the flag are counted too.
 - The counters are in the attribute `defrost.flag` of `…_plausibility`. With at least
   5 cycles the entity warns when more than half of the flagged cycles are not seen in

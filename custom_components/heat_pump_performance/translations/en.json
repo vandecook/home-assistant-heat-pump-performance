@@ -51,6 +51,8 @@
           "max_flow_m3h": "Maximum plausible flow (m³/h)",
           "max_delta_t": "Maximum plausible supply/return difference (K)",
           "max_input_age_s": "Input is stale after (s, 0 = never)",
+          "defrost_delta_t": "Defrost: supply below return by more than (K)",
+          "defrost_min_duration_s": "Defrost: must last at least (s)",
           "ref_cop_cold": "Manufacturer COP at -7 °C outdoor / 35 °C flow",
           "ref_cop_warm": "Manufacturer COP at 2 °C outdoor / 35 °C flow"
         }
@@ -92,6 +94,8 @@
           "max_flow_m3h": "Maximum plausible flow (m³/h)",
           "max_delta_t": "Maximum plausible supply/return difference (K)",
           "max_input_age_s": "Input is stale after (s, 0 = never)",
+          "defrost_delta_t": "Defrost: supply below return by more than (K)",
+          "defrost_min_duration_s": "Defrost: must last at least (s)",
           "ref_cop_cold": "Manufacturer COP at -7 °C outdoor / 35 °C flow",
           "ref_cop_warm": "Manufacturer COP at 2 °C outdoor / 35 °C flow",
           "max_thermal_power_kw": "Maximum thermal power (kW)",

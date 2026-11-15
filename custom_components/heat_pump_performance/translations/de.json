@@ -51,6 +51,8 @@
           "max_flow_m3h": "Maximal plausibler Durchfluss (m³/h)",
           "max_delta_t": "Maximal plausible Spreizung Vor-/Rücklauf (K)",
           "max_input_age_s": "Eingang gilt nach (s) als veraltet, 0 = nie",
+          "defrost_delta_t": "Abtauen: Vorlauf unter Rücklauf um mehr als (K)",
+          "defrost_min_duration_s": "Abtauen: Mindestdauer (s)",
           "ref_cop_cold": "Hersteller-COP bei -7 °C Außen / 35 °C Vorlauf",
           "ref_cop_warm": "Hersteller-COP bei 2 °C Außen / 35 °C Vorlauf"
         }
@@ -92,6 +94,8 @@
           "max_flow_m3h": "Maximal plausibler Durchfluss (m³/h)",
           "max_delta_t": "Maximal plausible Spreizung Vor-/Rücklauf (K)",
           "max_input_age_s": "Eingang gilt nach (s) als veraltet, 0 = nie",
+          "defrost_delta_t": "Abtauen: Vorlauf unter Rücklauf um mehr als (K)",
+          "defrost_min_duration_s": "Abtauen: Mindestdauer (s)",
           "ref_cop_cold": "Hersteller-COP bei -7 °C Außen / 35 °C Vorlauf",
           "ref_cop_warm": "Hersteller-COP bei 2 °C Außen / 35 °C Vorlauf",
           "max_thermal_power_kw": "Maximale thermische Leistung (kW)",

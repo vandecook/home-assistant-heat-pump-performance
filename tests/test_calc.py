@@ -73,7 +73,7 @@ def test_integrator_invalid_sample_breaks_chain():
 
 
 def test_defrost_detector_counts_sustained_negative_only():
-    det = calc.DefrostDetector(threshold_kw=0.3, min_duration_s=20)
+    det = calc.DefrostDetector(threshold_k=0.5, min_duration_s=20)
     assert not det.update(0, -1.0)
     assert not det.update(10, -1.0)
     assert det.update(25, -1.0)  # confirmed after 20+ s
@@ -200,7 +200,7 @@ def _tracker():
 def test_defrost_flag_confirmed_by_negative_power():
     t = _tracker()
     t.flag_changed(0, True)
-    t.power_sample(30, -1.5, False)
+    t.delta_sample(30, -1.5, False)
     t.flag_changed(200, False)
     assert (t.flag_cycles, t.confirmed, t.unconfirmed) == (1, 1, 0)
     assert t.flag_duration_s == 200
@@ -209,7 +209,7 @@ def test_defrost_flag_confirmed_by_negative_power():
 def test_defrost_flag_without_negative_power_is_unconfirmed():
     t = _tracker()
     t.flag_changed(0, True)
-    t.power_sample(30, 2.0, False)
+    t.delta_sample(30, 2.0, False)
     t.flag_changed(200, False)
     assert (t.confirmed, t.unconfirmed) == (0, 1)
 
@@ -219,17 +219,17 @@ def test_defrost_flag_late_reaction_within_grace_confirms():
     t.flag_changed(0, True)
     t.flag_changed(100, False)
     assert t.unconfirmed == 1
-    t.power_sample(150, -2.0, False)
+    t.delta_sample(150, -2.0, False)
     assert (t.confirmed, t.unconfirmed) == (1, 0)
 
 
 def test_detected_cycle_without_flag_is_counted_outside_grace_only():
     t = _tracker()
-    t.power_sample(1000, -2.0, True)
+    t.delta_sample(1000, -2.0, True)
     assert t.detected_without_flag == 1
     t.flag_changed(2000, True)
     t.flag_changed(2100, False)
-    t.power_sample(2150, -2.0, True)  # inside the grace period after the flag
+    t.delta_sample(2150, -2.0, True)  # inside the grace period after the flag
     assert t.detected_without_flag == 1
 
 
