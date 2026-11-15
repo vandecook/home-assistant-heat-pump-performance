@@ -1,5 +1,7 @@
 # Heat Pump Performance
 
+**English** | [Deutsch](README.de.md)
+
 **Current version: 0.2.0**
 
 Repository: https://github.com/vandecook/home-assistant-heat-pump-performance
