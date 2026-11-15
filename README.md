@@ -133,6 +133,8 @@ domestic hot water, so they are not directly comparable to a test-bench figure.
 
 ## Defrost
 
+See [docs/defrost.md](docs/defrost.md) for the full explanation.
+
 During a defrost the heat pump takes heat out of the heating water, so supply
 drops below return and the power becomes **negative**. This is real energy, not a
 sensor error. It is booked separately as *defrost loss* instead of being clipped

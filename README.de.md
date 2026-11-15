@@ -141,6 +141,8 @@ vergleichbar.
 
 ## Abtauen
 
+Ausführliche Erklärung: [docs/defrost.de.md](docs/defrost.de.md).
+
 Beim Abtauen entzieht die Wärmepumpe dem Heizwasser Wärme. Der Vorlauf fällt dann
 unter den Rücklauf, und die Leistung wird **negativ**. Das ist echte Energie und
 kein Sensorfehler. Sie wird als *Abtauverlust* getrennt gebucht und nicht auf null
