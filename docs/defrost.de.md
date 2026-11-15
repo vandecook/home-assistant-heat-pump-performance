@@ -57,6 +57,32 @@ Mit dem Wärme-Modus (Optionen) legst du fest, was in die Arbeitszahl eingeht:
 | `meter_minus_defrost` | Wärmemengenzähler abzüglich des berechneten Abtauverlusts |
 | `calculated` | berechnete gelieferte Wärme abzüglich des Abtauverlusts |
 
+## Optionaler Eingang „Abtauen aktiv"
+
+Meldet deine Wärmepumpe, wann sie abtaut (ein `binary_sensor`, `switch`,
+`input_boolean` oder Ähnliches, das beim Abtauen `on` ist), kannst du das in der
+Konfiguration oder den Optionen als **Abtauen aktiv** auswählen.
+
+Das Signal dient **nur zur Gegenprüfung**. Die Energie wird weiterhin nach dem Vorzeichen
+der berechneten Leistung gebucht, ein falsches oder fehlendes Signal verändert die
+Arbeitszahl also nie. Die Integration macht damit Folgendes:
+
+- Jeder gemeldete Vorgang wird geprüft: Haben die Wassertemperaturen das Abtauen gezeigt
+  (Leistung unter −0,3 kW, solange das Signal an war oder bis 2 Minuten danach)? Das
+  Ergebnis wird als `confirmed_by_temperatures` oder `not_seen_in_temperatures` gezählt.
+- Aus den Temperaturen erkannte Vorgänge, die ohne das Signal beginnen, werden als
+  `detected_without_flag` gezählt.
+- Alles steht im Attribut `defrost.flag` von `…_plausibility` und bleibt über Neustarts
+  erhalten. `reset_history` mit `reset_spikes: true` setzt es zurück.
+- Ab 5 Vorgängen warnt die Plausibilitäts-Entität, wenn mehr als die Hälfte der
+  gemeldeten Vorgänge in den Temperaturen nicht zu sehen ist
+  (`defrost_flag_without_negative_power`) oder wenn mehr als die Hälfte aller Vorgänge
+  ohne das Signal beginnt (`negative_power_without_defrost_flag`).
+
+Ein Signal, das dauernd `on` ist (zum Beispiel eine „Eisüberwachung", die kein echtes
+Abtausignal ist), erzeugt viele unbestätigte Vorgänge und zeigt sich als Warnung. Prüfe,
+was deine Entität wirklich bedeutet, bevor du dich darauf verlässt.
+
 ## Was du in Home Assistant siehst
 
 | Entität | Inhalt |

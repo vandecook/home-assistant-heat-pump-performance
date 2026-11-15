@@ -45,6 +45,7 @@ und Einheiten lassen sich später in den Optionen ändern.
 | Elektrische Energie, Steuerung und Lüftung (kumuliert) | nein | Netto-COP (wird vom Gesamtwert abgezogen) |
 | Elektrische Leistung, Gesamtsystem / Steuerung | nein | für später gespeichert; die Arbeitszahl nutzt die Energiezähler |
 | Heizen aktiv / Warmwasser aktiv | nein | Aufteilung in Heizen und Warmwasser |
+| Abtauen aktiv | nein | optionale Gegenprüfung der erkannten Abtauvorgänge, siehe [docs/defrost.de.md](docs/defrost.de.md) |
 | Durchfluss (m³/h, l/min, l/h) | nein* | berechnete Wärme |
 | Vorlauftemperatur | nein* | berechnete Wärme |
 | Rücklauftemperatur | nein* | berechnete Wärme |

@@ -58,6 +58,33 @@ You choose in the thermal mode (options) what feeds the working ratio:
 | `meter_minus_defrost` | heat meter minus the calculated defrost loss |
 | `calculated` | calculated delivered heat minus the defrost loss |
 
+## Optional input: "Defrost active"
+
+If your heat pump reports when it is defrosting (a `binary_sensor`, `switch`,
+`input_boolean` or similar that is `on` during the defrost), you can select it as
+**Defrost active** in the config or the options.
+
+The signal is a **cross check only**. The energy is still booked from the sign of the
+calculated power, so wrong or missing flags never change the working ratio. What the
+integration does with it:
+
+- Every flagged cycle is checked: did the water temperatures show the defrost
+  (power below −0.3 kW while the flag was on, or within 2 minutes after it went
+  off)? The result is counted as `confirmed_by_temperatures` or
+  `not_seen_in_temperatures`.
+- Cycles detected from the temperatures that start without the flag are counted as
+  `detected_without_flag`.
+- Everything is shown in the attribute `defrost.flag` of `…_plausibility` and kept
+  across restarts. `reset_history` with `reset_spikes: true` clears it.
+- With at least 5 cycles the plausibility entity warns when more than half of the
+  flagged cycles are not seen in the temperatures
+  (`defrost_flag_without_negative_power`) or when more than half of all cycles start
+  without the flag (`negative_power_without_defrost_flag`).
+
+A flag that is `on` all the time (for example an "ice monitoring" state that is not a
+real defrost signal) produces many unconfirmed cycles and shows up as a warning. Check
+what your entity really means before relying on it.
+
 ## What you see in Home Assistant
 
 | Entity | Content |

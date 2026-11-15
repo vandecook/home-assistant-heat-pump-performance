@@ -44,6 +44,7 @@ All input entities and units can be changed later in the options flow.
 | Electrical energy, controls and ventilation (cumulative) | no | net COP (subtracted from the total) |
 | Electrical power, complete system / controls | no | stored for later; the working ratio uses the energy counters |
 | Heating active / domestic hot water active | no | split into heating and DHW |
+| Defrost active | no | optional cross check of the detected defrost, see [docs/defrost.md](docs/defrost.md) |
 | Flow rate (m³/h, l/min, l/h) | no* | calculated heat |
 | Supply (flow) temperature | no* | calculated heat |
 | Return temperature | no* | calculated heat |

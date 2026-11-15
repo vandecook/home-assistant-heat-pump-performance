@@ -25,6 +25,7 @@ from .calc import (
     STATUS_OK,
     STATUS_STALE,
     DefrostDetector,
+    DefrostFlagTracker,
     PlausibilityStats,
     SampleLimits,
     ThermalIntegrator,
@@ -57,6 +58,7 @@ from .const import (
     MODE_METER_MINUS_DEFROST,
     CONF_AUX_ENERGY,
     CONF_AUX_ENERGY_UNIT,
+    CONF_DEFROST_ACTIVE,
     CONF_DHW_ACTIVE,
     CONF_ELECTRICAL_ENERGY,
     CONF_ELECTRICAL_ENERGY_UNIT,
@@ -215,6 +217,7 @@ class HeatPumpPerformanceRuntime:
         self._listeners: list[Callable[[], None]] = []
         self._integrator = ThermalIntegrator(max_gap_s=300.0)
         self._defrost = DefrostDetector()
+        self._defrost_flag = DefrostFlagTracker()
         self._calc_roles: dict[str, str] = self._build_calc_roles()
         self._unsub_tick: Callable[[], None] | None = None
         self._eval_unsub: Callable[[], None] | None = None
@@ -251,6 +254,9 @@ class HeatPumpPerformanceRuntime:
             entities.append(self.data[CONF_HEATING_ACTIVE])
         if self.data.get(CONF_DHW_ACTIVE):
             entities.append(self.data[CONF_DHW_ACTIVE])
+        if self.data.get(CONF_DEFROST_ACTIVE):
+            entities.append(self.data[CONF_DEFROST_ACTIVE])
+            self._defrost_flag.seed(dt_util.now().timestamp(), bool(self.is_on(self.data[CONF_DEFROST_ACTIVE])))
         entities.extend(self._calc_roles)
         self._unsub = async_track_state_change_event(
             self.hass, entities, self._async_state_changed
@@ -293,6 +299,12 @@ class HeatPumpPerformanceRuntime:
         if entity_id in self._calc_roles:
             self._on_calc_input(entity_id, new_state, now)
             await self._save_if_due(now)
+            return
+
+        if self.data.get(CONF_DEFROST_ACTIVE) and entity_id == self.data[CONF_DEFROST_ACTIVE]:
+            if new_state is not None and new_state.state.lower() not in ("unavailable", "unknown"):
+                self._defrost_flag.flag_changed(now.timestamp(), bool(self.is_on(entity_id)))
+            self._notify()
             return
 
         if entity_id in (
@@ -573,7 +585,9 @@ class HeatPumpPerformanceRuntime:
         else:
             self.state.sample_stats.record_ok(ts)
         heat, loss = self._integrator.step(ts, power)
-        self._defrost.update(ts, power)
+        started = self._defrost.update(ts, power)
+        if self.data.get(CONF_DEFROST_ACTIVE):
+            self._defrost_flag.power_sample(ts, power, started)
         if heat or loss:
             self._book_calc_energy(heat, loss, now)
 
@@ -651,6 +665,7 @@ class HeatPumpPerformanceRuntime:
             meter_deviation=deviation,
             defrost_share=share,
             cop_gross_status=cop_state if cop_state != "insufficient_data" else None,
+            extra_warnings=self._defrost_flag.warnings() if self.data.get(CONF_DEFROST_ACTIVE) else None,
         )
         return {
             "enabled": enabled,
@@ -669,6 +684,7 @@ class HeatPumpPerformanceRuntime:
                 "duration_s_total": round(self._defrost.duration_s_total, 1),
                 "loss_kwh_lifetime": round(life.calc_loss, 4),
                 "share_of_heat_pct": None if share is None else round(share, 2),
+                "flag": self._defrost_flag.to_dict() if self.data.get(CONF_DEFROST_ACTIVE) else None,
             },
             "meter_vs_calc": {
                 "paired_meter_kwh": round(self.state.cmp_meter_kwh, 3),
@@ -882,6 +898,7 @@ class HeatPumpPerformanceRuntime:
         for entity_key, role in (
             (CONF_HEATING_ACTIVE, "heating_active"),
             (CONF_DHW_ACTIVE, "dhw_active"),
+            (CONF_DEFROST_ACTIVE, "defrost_active"),
         ):
             entity_id = self.data.get(entity_key)
             if not entity_id:
@@ -1156,6 +1173,7 @@ class HeatPumpPerformanceRuntime:
             self.state.increment_stats = PlausibilityStats()
             self._defrost.count = 0
             self._defrost.duration_s_total = 0.0
+            self._defrost_flag.reset()
             self._integrator.gap_seconds_total = 0.0
         self._refresh_quality()
         await self._save()
@@ -1195,6 +1213,7 @@ class HeatPumpPerformanceRuntime:
                 "increment_stats": self.state.increment_stats.to_dict(),
                 "defrost_count": self._defrost.count,
                 "defrost_duration_s": self._defrost.duration_s_total,
+                "defrost_flag": self._defrost_flag.to_dict(),
                 "gap_seconds_total": self._integrator.gap_seconds_total,
             },
         }
@@ -1243,6 +1262,7 @@ class HeatPumpPerformanceRuntime:
         self.state.increment_stats = PlausibilityStats.from_dict(calc.get("increment_stats"))
         self._defrost.count = int(calc.get("defrost_count", 0) or 0)
         self._defrost.duration_s_total = float(calc.get("defrost_duration_s", 0.0) or 0.0)
+        self._defrost_flag.restore(calc.get("defrost_flag"))
         self._integrator.gap_seconds_total = float(calc.get("gap_seconds_total", 0.0) or 0.0)
 
     async def _save(self) -> None:

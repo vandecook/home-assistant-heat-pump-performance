@@ -190,3 +190,69 @@ def test_reference_cop_interpolation_and_clamp():
     assert calc.reference_cop(-2.5, pts) == pytest.approx(3.0)
     assert calc.reference_cop(-20, pts) == pytest.approx(2.7)
     assert calc.reference_cop(10, pts) == pytest.approx(3.3)
+
+
+# --- Defrost flag cross check -----------------------------------------------
+def _tracker():
+    return calc.DefrostFlagTracker()
+
+
+def test_defrost_flag_confirmed_by_negative_power():
+    t = _tracker()
+    t.flag_changed(0, True)
+    t.power_sample(30, -1.5, False)
+    t.flag_changed(200, False)
+    assert (t.flag_cycles, t.confirmed, t.unconfirmed) == (1, 1, 0)
+    assert t.flag_duration_s == 200
+
+
+def test_defrost_flag_without_negative_power_is_unconfirmed():
+    t = _tracker()
+    t.flag_changed(0, True)
+    t.power_sample(30, 2.0, False)
+    t.flag_changed(200, False)
+    assert (t.confirmed, t.unconfirmed) == (0, 1)
+
+
+def test_defrost_flag_late_reaction_within_grace_confirms():
+    t = _tracker()
+    t.flag_changed(0, True)
+    t.flag_changed(100, False)
+    assert t.unconfirmed == 1
+    t.power_sample(150, -2.0, False)
+    assert (t.confirmed, t.unconfirmed) == (1, 0)
+
+
+def test_detected_cycle_without_flag_is_counted_outside_grace_only():
+    t = _tracker()
+    t.power_sample(1000, -2.0, True)
+    assert t.detected_without_flag == 1
+    t.flag_changed(2000, True)
+    t.flag_changed(2100, False)
+    t.power_sample(2150, -2.0, True)  # inside the grace period after the flag
+    assert t.detected_without_flag == 1
+
+
+def test_defrost_flag_seed_does_not_count_a_cycle_and_warnings():
+    t = _tracker()
+    t.seed(0, True)
+    assert t.flag_cycles == 0 and t.flag_on
+    t = _tracker()
+    t.flag_cycles = 6
+    t.unconfirmed = 5
+    assert t.warnings() and t.warnings()[0].startswith("defrost_flag_without_negative_power")
+    t = _tracker()
+    t.flag_cycles = 1
+    t.detected_without_flag = 5
+    assert t.warnings() and t.warnings()[0].startswith("negative_power_without_defrost_flag")
+
+
+def test_defrost_flag_persistence_roundtrip():
+    t = _tracker()
+    t.flag_cycles, t.confirmed, t.unconfirmed, t.detected_without_flag = 4, 3, 1, 2
+    t.flag_duration_s = 640.0
+    u = _tracker()
+    u.restore(t.to_dict())
+    assert u.to_dict()["cycles"] == 4 and u.confirmed == 3 and u.detected_without_flag == 2
+    u.reset()
+    assert u.flag_cycles == 0 and u.unconfirmed == 0
