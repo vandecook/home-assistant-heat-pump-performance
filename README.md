@@ -1,5 +1,7 @@
 # Heat Pump Performance
 
+**English** | [Deutsch](README.de.md)
+
 **Current version: 0.2.0**
 
 Repository: https://github.com/vandecook/home-assistant-heat-pump-performance
@@ -203,9 +205,31 @@ totals are kept.
 
 ## Installation
 
-Via HACS: add the repository as a custom repository (category *Integration*),
-install it, restart Home Assistant and add **Heat Pump Performance** under
-*Settings > Devices & services*.
+### Quick install (Marketplace / HACS)
+
+1. Open the repository in your Marketplace or HACS:
+   [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=vandecook&repository=home-assistant-heat-pump-performance&category=integration)
+2. Click **Download** and select the latest version.
+3. **Restart Home Assistant.**
+4. Go to *Settings > Devices & services > Add integration*, search for
+   **Heat Pump Performance** and follow the dialog.
+5. Pick your energy counters (thermal and electrical energy are required). Flow
+   rate, supply and return temperature are optional and enable the calculated heat.
+
+### Step by step without the button
+
+- **Home Assistant 2026.11 or newer:** open *Settings > Marketplace* (HACS is built
+  in). Add this repository as a custom repository (category *Integration*) if it is
+  not listed yet: `https://github.com/vandecook/home-assistant-heat-pump-performance`.
+- **Older versions with HACS:** *HACS > ⋮ > Custom repositories*, enter the URL
+  above, category *Integration*, then download.
+- **Manual:** copy the folder `custom_components/heat_pump_performance` from this
+  repository into the `custom_components` folder of your Home Assistant
+  configuration and restart.
+
+After an update, restart Home Assistant once; your stored balances are kept.
+
+### Installing a beta
 
 HACS offers only releases (and the default branch), not feature branches. To test
 a beta, publish a GitHub release marked as *pre-release*, switch on *Show beta
