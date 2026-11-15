@@ -181,7 +181,10 @@ der Config-Entry-ID):
 | `…_cop_heating`, `…_cop_dhw`, `…_spf_heating_yearly`, `…_spf_dhw_yearly` | Aufteilung Heizen / Warmwasser |
 | `…_thermal_energy`, `…_electrical_energy` und `_daily`-Varianten | aufsummierte Energie |
 | `…_calc_thermal_power` | vorzeichenbehaftete Wärmeleistung in kW |
-| `…_calc_thermal_energy` | berechnete gelieferte Wärme |
+| `…_calc_thermal_energy` | berechnete gelieferte Wärme (Gesamtsumme, wird nie zurückgesetzt) |
+| `…_calc_thermal_energy_daily` | berechnete gelieferte Wärme von heute |
+| `…_meter_deviation` | Wärmemengenzähler gegen Berechnung in %, über die Fenster, in denen beide für denselben Zeitraum gebucht wurden (ab 10 kWh) |
+| `…_meter_deviation_daily` | Zähler-Wärme von heute gegen berechnete Wärme von heute in % (ab 10 kWh) |
 | `…_defrost_energy`, `…_defrost_count` | berechneter Abtauverlust und erkannte Vorgänge |
 | `…_cop_reference` | Hersteller-COP bei der aktuellen Außentemperatur (gilt für 35 °C Vorlauf) |
 | `…_spike_count` | verworfene Ausreißer des Wärmemengenzählers |

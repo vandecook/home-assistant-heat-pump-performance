@@ -172,7 +172,10 @@ existing entity ID after a rename; the `unique_id` is based on the config entry)
 | `…_cop_heating`, `…_cop_dhw`, `…_spf_heating_yearly`, `…_spf_dhw_yearly` | heating / DHW split |
 | `…_thermal_energy`, `…_electrical_energy` and `_daily` variants | accumulated energy |
 | `…_calc_thermal_power` | signed thermal power in kW |
-| `…_calc_thermal_energy` | calculated delivered heat |
+| `…_calc_thermal_energy` | calculated delivered heat (lifetime total, never resets) |
+| `…_calc_thermal_energy_daily` | calculated delivered heat of today |
+| `…_meter_deviation` | heat meter vs. calculation in %, over the windows in which both were booked for the same time span (needs ≥ 10 kWh) |
+| `…_meter_deviation_daily` | today's heat meter energy vs. today's calculated heat in % (needs ≥ 10 kWh) |
 | `…_defrost_energy`, `…_defrost_count` | calculated defrost loss and detected cycles |
 | `…_cop_reference` | manufacturer COP at the current outdoor temperature (valid for 35 °C flow) |
 | `…_spike_count` | rejected heat meter spikes |
