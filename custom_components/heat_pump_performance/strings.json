@@ -14,7 +14,11 @@
           "aux_energy": "Electrical energy - controls and ventilation",
           "aux_power": "Electrical power - controls and ventilation",
           "heating_active": "Heating active",
-          "dhw_active": "Domestic hot water active"
+          "dhw_active": "Domestic hot water active",
+          "flow_rate": "Flow rate - heating circuit",
+          "supply_temp": "Supply (flow) temperature",
+          "return_temp": "Return temperature",
+          "outdoor_temp": "Outdoor temperature (optional, for the reference COP)"
         }
       },
       "units": {
@@ -25,7 +29,8 @@
           "electrical_energy_unit": "Electrical energy unit",
           "electrical_power_unit": "Electrical power unit",
           "aux_energy_unit": "Auxiliary energy unit",
-          "aux_power_unit": "Auxiliary power unit"
+          "aux_power_unit": "Auxiliary power unit",
+          "flow_rate_unit": "Flow rate unit"
         }
       },
       "periods": {
@@ -39,13 +44,22 @@
           "heating_season_end": "Heating season end (MM-DD)",
           "max_thermal_power_kw": "Maximum thermal power (kW)",
           "thermal_safety_factor": "Safety factor",
-          "thermal_resolution_kwh": "Meter resolution / tolerance (kWh)"
+          "thermal_resolution_kwh": "Meter resolution / tolerance (kWh)",
+          "thermal_mode": "Thermal energy used for the working ratio",
+          "min_flow_m3h": "Minimum flow for a heat flow (m³/h)",
+          "max_flow_m3h": "Maximum plausible flow (m³/h)",
+          "max_delta_t": "Maximum plausible supply/return difference (K)",
+          "max_input_age_s": "Input is stale after (s, 0 = never)",
+          "ref_cop_cold": "Manufacturer COP at -7 °C outdoor / 35 °C flow",
+          "ref_cop_warm": "Manufacturer COP at 2 °C outdoor / 35 °C flow"
         }
       }
     },
     "error": {
       "date_required": "Select a date for partial year.",
-      "invalid_mm_dd": "Use MM-DD, for example 10-01."
+      "invalid_mm_dd": "Use MM-DD, for example 10-01.",
+      "calc_inputs_incomplete": "Flow rate, supply temperature and return temperature must be set together.",
+      "calc_inputs_required": "This mode needs flow rate, supply temperature and return temperature."
     }
   },
   "options": {
@@ -62,7 +76,11 @@
           "aux_energy": "Electrical energy - controls and ventilation",
           "aux_power": "Electrical power - controls and ventilation",
           "heating_active": "Heating active",
-          "dhw_active": "Domestic hot water active"
+          "dhw_active": "Domestic hot water active",
+          "flow_rate": "Flow rate - heating circuit",
+          "supply_temp": "Supply (flow) temperature",
+          "return_temp": "Return temperature",
+          "outdoor_temp": "Outdoor temperature (optional, for the reference COP)"
         }
       },
       "units": {
@@ -73,21 +91,33 @@
           "electrical_energy_unit": "Electrical energy unit",
           "electrical_power_unit": "Electrical power unit",
           "aux_energy_unit": "Auxiliary energy unit",
-          "aux_power_unit": "Auxiliary power unit"
+          "aux_power_unit": "Auxiliary power unit",
+          "flow_rate_unit": "Flow rate unit"
         }
       },
       "periods": {
-        "title": "Heat Pump Performance options",
-        "description": "The initial yearly start cannot be changed after first setup.",
+        "title": "Periods, limits and calculation",
+        "description": "The initial yearly start cannot be changed after first setup. Limits are used for the plausibility checks.",
         "data": {
           "heating_season_enabled": "Enable heating-season working ratio",
           "heating_season_start": "Heating season start (MM-DD)",
           "heating_season_end": "Heating season end (MM-DD)",
           "max_thermal_power_kw": "Maximum thermal power (kW)",
           "thermal_safety_factor": "Safety factor",
-          "thermal_resolution_kwh": "Meter resolution / tolerance (kWh)"
+          "thermal_resolution_kwh": "Meter resolution / tolerance (kWh)",
+          "thermal_mode": "Thermal energy used for the working ratio",
+          "min_flow_m3h": "Minimum flow for a heat flow (m³/h)",
+          "max_flow_m3h": "Maximum plausible flow (m³/h)",
+          "max_delta_t": "Maximum plausible supply/return difference (K)",
+          "max_input_age_s": "Input is stale after (s, 0 = never)",
+          "ref_cop_cold": "Manufacturer COP at -7 °C outdoor / 35 °C flow",
+          "ref_cop_warm": "Manufacturer COP at 2 °C outdoor / 35 °C flow"
         }
       }
+    },
+    "error": {
+      "calc_inputs_incomplete": "Flow rate, supply temperature and return temperature must be set together.",
+      "calc_inputs_required": "This mode needs flow rate, supply temperature and return temperature."
     }
   },
   "selector": {
@@ -102,6 +132,13 @@
         "from_now": "Start from now",
         "full_year": "Full year (January 1, if Recorder history is available)",
         "partial_year": "Partial year from selected date"
+      }
+    },
+    "thermal_mode": {
+      "options": {
+        "meter": "Heat meter (as before)",
+        "meter_minus_defrost": "Heat meter minus calculated defrost loss",
+        "calculated": "Fully calculated from flow and temperatures (signed)"
       }
     }
   },

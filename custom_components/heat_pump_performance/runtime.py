@@ -10,11 +10,51 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, State
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import (
+    async_call_later,
+    async_track_state_change_event,
+    async_track_time_interval,
+)
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
+from .calc import (
+    MAX_INPUT_AGE_S,
+    STATUS_IDLE,
+    STATUS_MISSING,
+    STATUS_OK,
+    STATUS_STALE,
+    DefrostDetector,
+    PlausibilityStats,
+    SampleLimits,
+    ThermalIntegrator,
+    assess_health,
+    check_energy_increment,
+    check_meter_against_calc,
+    cop_status,
+    defrost_share_pct,
+    evaluate_thermal_sample,
+    flow_to_m3h,
+    meter_deviation_pct,
+    reference_cop,
+)
 from .const import (
+    CONF_FLOW,
+    CONF_FLOW_UNIT,
+    CONF_MAX_DELTA_T,
+    CONF_MAX_ELECTRICAL_POWER,
+    CONF_MAX_FLOW,
+    CONF_MAX_INPUT_AGE,
+    CONF_MIN_FLOW,
+    CONF_OUTDOOR_TEMP,
+    CONF_REF_COP_COLD,
+    CONF_REF_COP_WARM,
+    CONF_RETURN_TEMP,
+    CONF_SUPPLY_TEMP,
+    CONF_THERMAL_MODE,
+    MODE_CALCULATED,
+    MODE_METER,
+    MODE_METER_MINUS_DEFROST,
     CONF_AUX_ENERGY,
     CONF_AUX_ENERGY_UNIT,
     CONF_DHW_ACTIVE,
@@ -47,6 +87,26 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# The calculation is re-evaluated at this interval even when no input changed, so
+# a legitimately constant reading keeps integrating instead of looking like a gap.
+CALC_TICK_S = 30
+# Flow, supply and return usually arrive as separate state changes of one device
+# payload. Evaluating after each one would judge half-updated, inconsistent
+# combinations (e.g. new supply with old return) and reject them as glitches.
+# Inputs are therefore collected and evaluated once, this long after the first.
+CALC_DEBOUNCE_S = 1.0
+# Self-calculated energy only lives in memory between meter steps; persist it
+# at most this often.
+SAVE_INTERVAL_S = 300.0
+
+# Config key of each self-calculation input role.
+_ROLE_KEYS = {
+    "flow": CONF_FLOW,
+    "supply": CONF_SUPPLY_TEMP,
+    "return": CONF_RETURN_TEMP,
+    "outdoor": CONF_OUTDOOR_TEMP,
+}
+
 
 @dataclass
 class Bucket:
@@ -59,17 +119,44 @@ class Bucket:
     # arrive out of order; AZ remains unavailable until it is positive again.
     net_electrical_accum: float = 0.0
     start: str | None = None
+    # Self-calculated heat (flow x delta T): delivered heat and defrost loss.
+    calc_heat: float = 0.0
+    calc_loss: float = 0.0
+    # Effective thermal energy that feeds the COP, according to the thermal mode.
+    # In the default "meter" mode this always equals ``thermal``.
+    eff: float = 0.0
+    # Domestic-hot-water share of ``eff`` and of the net electrical energy.
+    eff_dhw: float = 0.0
+    net_dhw: float = 0.0
 
     @property
     def net_electrical(self) -> float:
         return self.net_electrical_accum
 
+    @staticmethod
+    def _ratio(thermal: float, electrical: float) -> float | None:
+        if thermal <= 0 or electrical <= 0:
+            return None
+        return thermal / electrical
+
     @property
     def az(self) -> float | None:
-        net = self.net_electrical
-        if self.thermal <= 0 or net <= 0:
-            return None
-        return self.thermal / net
+        """Working ratio on net electrical energy (without controls/ventilation)."""
+        return self._ratio(self.eff, self.net_electrical)
+
+    @property
+    def cop_gross(self) -> float | None:
+        """COP on the complete electrical energy of the system."""
+        return self._ratio(self.eff, self.electrical)
+
+    @property
+    def az_dhw(self) -> float | None:
+        return self._ratio(self.eff_dhw, self.net_dhw)
+
+    @property
+    def az_heating(self) -> float | None:
+        """Everything that is not domestic hot water."""
+        return self._ratio(self.eff - self.eff_dhw, self.net_electrical - self.net_dhw)
 
 
 @dataclass
@@ -98,6 +185,19 @@ class RuntimeState:
     rejected_thermal_last: dict[str, Any] = field(default_factory=dict)
     previous_day: dict[str, Any] = field(default_factory=dict)
     previous_month: dict[str, Any] = field(default_factory=dict)
+    # Self-calculation (flow x delta T) and its plausibility bookkeeping.
+    calc_latest: dict[str, float] = field(default_factory=dict)
+    calc_power_kw: float | None = None
+    calc_status: str = "inactive"
+    calc_signature: str | None = None
+    # Calculated heat since the last accepted meter increment (not persisted).
+    calc_heat_since_meter: float = 0.0
+    calc_window_start_ts: float | None = None
+    # Paired meter/calculation energy over windows without data gaps.
+    cmp_meter_kwh: float = 0.0
+    cmp_calc_kwh: float = 0.0
+    sample_stats: PlausibilityStats = field(default_factory=PlausibilityStats)
+    increment_stats: PlausibilityStats = field(default_factory=PlausibilityStats)
 
 
 class HeatPumpPerformanceRuntime:
@@ -113,6 +213,12 @@ class HeatPumpPerformanceRuntime:
         self.state = RuntimeState()
         self._unsub: Callable[[], None] | None = None
         self._listeners: list[Callable[[], None]] = []
+        self._integrator = ThermalIntegrator(max_gap_s=300.0)
+        self._defrost = DefrostDetector()
+        self._calc_roles: dict[str, str] = self._build_calc_roles()
+        self._unsub_tick: Callable[[], None] | None = None
+        self._eval_unsub: Callable[[], None] | None = None
+        self._last_save_ts: float = 0.0
 
     async def async_setup(self) -> None:
         """Restore state and start tracking inputs."""
@@ -121,9 +227,11 @@ class HeatPumpPerformanceRuntime:
             self._restore(saved)
         self._roll_periods(dt_util.now())
         self._rebase_if_sources_changed()
+        self._rebase_if_calc_changed()
         self._prune_diagnostics_for_current_config()
         await self._seed_missing_last_values()
         self._seed_diagnostic_values()
+        self._seed_calc_inputs()
         for entity_id in self.state.last_values:
             self.state.accepted_at.setdefault(entity_id, dt_util.now().isoformat())
         self._refresh_quality()
@@ -143,15 +251,26 @@ class HeatPumpPerformanceRuntime:
             entities.append(self.data[CONF_HEATING_ACTIVE])
         if self.data.get(CONF_DHW_ACTIVE):
             entities.append(self.data[CONF_DHW_ACTIVE])
+        entities.extend(self._calc_roles)
         self._unsub = async_track_state_change_event(
             self.hass, entities, self._async_state_changed
         )
+        if self.calc_enabled:
+            self._unsub_tick = async_track_time_interval(
+                self.hass, self._async_calc_tick, timedelta(seconds=CALC_TICK_S)
+            )
         await self._save()
 
     async def async_shutdown(self) -> None:
         if self._unsub:
             self._unsub()
             self._unsub = None
+        if self._unsub_tick:
+            self._unsub_tick()
+            self._unsub_tick = None
+        if self._eval_unsub:
+            self._eval_unsub()
+            self._eval_unsub = None
         await self._save()
 
     def add_listener(self, listener: Callable[[], None]) -> Callable[[], None]:
@@ -170,6 +289,11 @@ class HeatPumpPerformanceRuntime:
         self._roll_periods(now)
         entity_id = event.data["entity_id"]
         new_state: State | None = event.data.get("new_state")
+
+        if entity_id in self._calc_roles:
+            self._on_calc_input(entity_id, new_state, now)
+            await self._save_if_due(now)
+            return
 
         if entity_id in (
             self.data.get(CONF_HEATING_ACTIVE),
@@ -217,21 +341,38 @@ class HeatPumpPerformanceRuntime:
             power = float(self.data.get(CONF_MAX_THERMAL_POWER, 12.0))
             factor = float(self.data.get(CONF_THERMAL_SAFETY_FACTOR, 1.2))
             resolution = float(self.data.get(CONF_THERMAL_RESOLUTION, 1.0))
-            allowed = power * factor * elapsed_hours + resolution
             change = value_kwh - previous
-            if change < -1e-7 or change > allowed + 1e-7:
+            reason, allowed = check_energy_increment(change, elapsed_hours, power, factor, resolution)
+            if reason == STATUS_OK and self.calc_enabled and change > 0:
+                # Second opinion: the meter may not run far ahead of the
+                # self-calculated heat (only judged over gap-free windows).
+                reason, calc_allowed = check_meter_against_calc(
+                    change,
+                    self.state.calc_heat_since_meter,
+                    resolution,
+                    self._calc_window_valid(now),
+                )
+                if reason != STATUS_OK:
+                    allowed = calc_allowed if calc_allowed is not None else allowed
+            if reason != STATUS_OK:
                 self.state.rejected_thermal_count += 1
                 self.state.rejected_thermal_last = {
                     "value_kwh": value_kwh, "last_valid_kwh": previous,
                     "delta_kwh": change, "allowed_delta_kwh": round(allowed, 6),
-                    "reason": "counter_decrease" if change < 0 else "excessive_energy_delta",
+                    "reason": reason,
+                    "calc_heat_since_meter_kwh": round(self.state.calc_heat_since_meter, 4),
                     "timestamp": now.isoformat(),
                 }
+                self.state.increment_stats.record_reject(
+                    now.timestamp(), reason, {"delta_kwh": change}
+                )
                 # Preserve accepted baseline and time; never book a rejected reading.
                 self._refresh_quality()
                 await self._save()
                 self._notify()
                 return
+            if change > 0:
+                self.state.increment_stats.record_ok(now.timestamp())
         self.state.last_values[entity_id] = value_kwh
         self.state.accepted_at[entity_id] = now.isoformat()
 
@@ -260,23 +401,302 @@ class HeatPumpPerformanceRuntime:
             "aux_energy": "aux",
         }[role]
         self._apply_delta(bucket_role, delta, now)
+        if bucket_role == "thermal":
+            self._pair_meter_with_calc(delta, now)
         self._refresh_quality()
         await self._save()
         self._notify()
 
-    def _apply_delta(self, role: str, delta: float, now: datetime) -> None:
+    def _buckets_for(self, now: datetime) -> list[Bucket]:
         buckets = [self.state.lifetime, self.state.daily, self.state.monthly, self.state.yearly]
         if self._is_in_heating_season(now):
             buckets.append(self.state.heating_season)
-        for bucket in buckets:
+        return buckets
+
+    @property
+    def thermal_mode(self) -> str:
+        mode = self.data.get(CONF_THERMAL_MODE, MODE_METER)
+        if mode != MODE_METER and not self.calc_enabled:
+            return MODE_METER  # self-calculation not configured: fall back safely
+        return mode
+
+    def _dhw_active(self) -> bool:
+        return bool(self.is_on(self.data.get(CONF_DHW_ACTIVE)))
+
+    def _apply_delta(self, role: str, delta: float, now: datetime) -> None:
+        dhw = self._dhw_active()
+        mode = self.thermal_mode
+        for bucket in self._buckets_for(now):
             if role == "thermal":
                 bucket.thermal += delta
+                if mode == MODE_METER:
+                    bucket.eff += delta
+                    if dhw:
+                        bucket.eff_dhw += delta
+                # Other modes derive ``eff`` from the calculation (see
+                # _book_calc_energy) so defrost loss is accounted for exactly once.
             elif role == "electrical":
                 bucket.electrical += delta
                 bucket.net_electrical_accum += delta
+                if dhw:
+                    bucket.net_dhw += delta
             elif role == "aux":
                 bucket.aux += delta
                 bucket.net_electrical_accum -= delta
+                if dhw:
+                    bucket.net_dhw -= delta
+
+    # ------------------------------------------------------------------
+    # Self-calculation from flow and flow/return temperature
+    # ------------------------------------------------------------------
+    def _build_calc_roles(self) -> dict[str, str]:
+        """Map entity_id -> role for the configured self-calculation inputs."""
+        roles: dict[str, str] = {}
+        for role, key in _ROLE_KEYS.items():
+            entity_id = self.data.get(key)
+            if entity_id:
+                roles[entity_id] = role
+        return roles
+
+    @property
+    def calc_enabled(self) -> bool:
+        """True when flow and both temperatures are configured."""
+        configured = set(self._calc_roles.values())
+        return {"flow", "supply", "return"} <= configured
+
+    def _calc_entity(self, role: str) -> str | None:
+        return self.data.get(_ROLE_KEYS[role])
+
+    def _calc_limits(self) -> SampleLimits:
+        power = float(self.data.get(CONF_MAX_THERMAL_POWER, 12.0))
+        factor = float(self.data.get(CONF_THERMAL_SAFETY_FACTOR, 1.2))
+        return SampleLimits(
+            min_flow_m3h=float(self.data.get(CONF_MIN_FLOW, 0.1)),
+            max_flow_m3h=float(self.data.get(CONF_MAX_FLOW, 3.0)),
+            max_abs_delta_t=float(self.data.get(CONF_MAX_DELTA_T, 25.0)),
+            max_power_kw=power * factor,
+        )
+
+    def _calc_signature(self) -> str:
+        return ";".join(f"{k}={self.data.get(k, '')}" for k in (CONF_FLOW, CONF_FLOW_UNIT, CONF_SUPPLY_TEMP, CONF_RETURN_TEMP))
+
+    def _rebase_if_calc_changed(self) -> None:
+        """Forget in-flight calculation state when its inputs were reconfigured."""
+        signature = self._calc_signature()
+        if self.state.calc_signature != signature:
+            self._integrator.reset()
+            self.state.calc_latest.clear()
+            self.state.calc_heat_since_meter = 0.0
+            self.state.calc_window_start_ts = None
+            self.state.calc_signature = signature
+
+    def _seed_calc_inputs(self) -> None:
+        now_ts = dt_util.now().timestamp()
+        for entity_id, role in self._calc_roles.items():
+            value = _state_float(self.hass.states.get(entity_id))
+            if value is not None:
+                self._store_calc_value(role, value, now_ts)
+
+    def _store_calc_value(self, role: str, value: float, ts: float) -> None:
+        if role == "flow":
+            value = flow_to_m3h(value, self.data.get(CONF_FLOW_UNIT, "m³/h"))
+        self.state.calc_latest[role] = value
+        self.state.calc_latest[f"{role}_ts"] = ts
+
+    def _calc_input_issues(self, now_ts: float) -> dict[str, str]:
+        """Per input: 'missing' (unavailable) or 'stale' (not updated lately)."""
+        issues: dict[str, str] = {}
+        max_age = float(self.data.get(CONF_MAX_INPUT_AGE, MAX_INPUT_AGE_S))
+        for role in ("flow", "supply", "return"):
+            entity_id = self._calc_entity(role)
+            if not entity_id:
+                continue
+            if _state_float(self.hass.states.get(entity_id)) is None:
+                issues[role] = "missing"
+                continue
+            # last_reported also advances when a source re-sends an unchanged
+            # value, so a legitimately constant reading is not called stale.
+            reported = self.hass.states.get(entity_id).last_reported.timestamp()
+            if max_age > 0 and now_ts - reported > max_age:
+                issues[role] = "stale"
+        return issues
+
+    def _on_calc_input(self, entity_id: str, new_state: State | None, now: datetime) -> None:
+        """Handle a change of flow, supply, return or outdoor temperature."""
+        role = self._calc_roles[entity_id]
+        value = _state_float(new_state)
+        ts = now.timestamp()
+        if value is None:
+            # Unavailable input: break the integration chain, count the reason.
+            if role != "outdoor":
+                self.state.sample_stats.record_reject(ts, STATUS_MISSING, {"role": role})
+                self.state.calc_power_kw = None
+                self.state.calc_status = STATUS_MISSING
+                self._integrator.step(ts, None)
+                self._defrost.update(ts, None)
+            self._notify()
+            return
+        self._store_calc_value(role, value, ts)
+        if role == "outdoor" or not self.calc_enabled:
+            self._notify()
+            return
+
+        self._schedule_calc_eval()
+        self._notify()
+
+    def _schedule_calc_eval(self) -> None:
+        """Evaluate once, shortly after the first input of a payload changed."""
+        if self._eval_unsub is None:
+            self._eval_unsub = async_call_later(self.hass, CALC_DEBOUNCE_S, self._async_calc_debounced)
+
+    async def _async_calc_debounced(self, _now: datetime) -> None:
+        self._eval_unsub = None
+        now = dt_util.now()
+        self._evaluate_calc_sample(now)
+        await self._save_if_due(now)
+        self._notify()
+
+    def _evaluate_calc_sample(self, now: datetime) -> None:
+        """Judge the latest flow/supply/return values, integrate and book them."""
+        ts = now.timestamp()
+        latest = self.state.calc_latest
+        power, status = evaluate_thermal_sample(
+            latest.get("flow"), latest.get("supply"), latest.get("return"), self._calc_limits()
+        )
+        self.state.calc_status = status
+        self.state.calc_power_kw = power
+        if power is None:
+            self.state.sample_stats.record_reject(
+                ts, status,
+                {k: latest.get(k) for k in ("flow", "supply", "return")},
+            )
+        else:
+            self.state.sample_stats.record_ok(ts)
+        heat, loss = self._integrator.step(ts, power)
+        self._defrost.update(ts, power)
+        if heat or loss:
+            self._book_calc_energy(heat, loss, now)
+
+    async def _async_calc_tick(self, _now: datetime) -> None:
+        """Re-evaluate the last known inputs so constant readings keep integrating."""
+        if not self.calc_enabled:
+            return
+        now = dt_util.now()
+        ts = now.timestamp()
+        issues = self._calc_input_issues(ts)
+        if issues:
+            role, issue = sorted(issues.items())[0]
+            status = STATUS_MISSING if issue == "missing" else STATUS_STALE
+            self.state.calc_status = status
+            self.state.calc_power_kw = None
+            self.state.sample_stats.record_reject(ts, status, {"role": role})
+            self._integrator.step(ts, None)
+            self._defrost.update(ts, None)
+        else:
+            self._evaluate_calc_sample(now)
+        await self._save_if_due(now)
+        self._notify()
+
+    def _calc_window_valid(self, now: datetime) -> bool:
+        """True when the calculation covered the window since the last meter step."""
+        if not self.calc_enabled:
+            return False
+        start = self.state.calc_window_start_ts
+        last_gap = self._integrator.last_gap_ts
+        if start is None:
+            return False
+        if last_gap is not None and last_gap >= start:
+            return False
+        return not self._calc_input_issues(now.timestamp())
+
+    def _book_calc_energy(self, heat: float, loss: float, now: datetime) -> None:
+        mode = self.thermal_mode
+        dhw = self._dhw_active()
+        for bucket in self._buckets_for(now):
+            bucket.calc_heat += heat
+            bucket.calc_loss += loss
+            if mode == MODE_CALCULATED:
+                bucket.eff += heat - loss
+                if dhw:
+                    bucket.eff_dhw += heat - loss
+            elif mode == MODE_METER_MINUS_DEFROST:
+                # The meter only ever sees heat delivered (it may even run
+                # backwards in defrost); the loss is subtracted separately.
+                bucket.eff -= loss
+                if dhw:
+                    bucket.eff_dhw -= loss
+        self.state.calc_heat_since_meter += heat
+
+    def _pair_meter_with_calc(self, meter_delta: float, now: datetime) -> None:
+        """Accumulate meter/calc pairs for the deviation diagnostic, then restart the window."""
+        if self._calc_window_valid(now):
+            self.state.cmp_meter_kwh += meter_delta
+            self.state.cmp_calc_kwh += self.state.calc_heat_since_meter
+        self.state.calc_heat_since_meter = 0.0
+        self.state.calc_window_start_ts = now.timestamp()
+
+    def calc_diagnostics(self) -> dict[str, Any]:
+        """Diagnostic view of the self-calculation and all plausibility checks."""
+        now_ts = dt_util.now().timestamp()
+        enabled = self.calc_enabled
+        life = self.state.lifetime
+        issues = self._calc_input_issues(now_ts) if enabled else {}
+        deviation = meter_deviation_pct(self.state.cmp_meter_kwh, self.state.cmp_calc_kwh) if enabled else None
+        share = defrost_share_pct(life.calc_heat, life.calc_loss) if enabled else None
+        cop_state = cop_status(life.eff, life.electrical)
+        health, warnings = assess_health(
+            configured=enabled,
+            consecutive_rejects=self.state.sample_stats.consecutive_rejects,
+            input_issues=issues,
+            meter_deviation=deviation,
+            defrost_share=share,
+            cop_gross_status=cop_state if cop_state != "insufficient_data" else None,
+        )
+        return {
+            "enabled": enabled,
+            "thermal_mode": self.thermal_mode,
+            "health": health,
+            "warnings": warnings,
+            "power_kw": self.state.calc_power_kw,
+            "last_sample_status": self.state.calc_status,
+            "inputs": {role: self.state.calc_latest.get(role) for role in ("flow", "supply", "return", "outdoor")},
+            "input_issues": issues,
+            "samples": self.state.sample_stats.to_dict(),
+            "meter_increments": self.state.increment_stats.to_dict(),
+            "defrost": {
+                "active": self._defrost.active,
+                "cycles": self._defrost.count,
+                "duration_s_total": round(self._defrost.duration_s_total, 1),
+                "loss_kwh_lifetime": round(life.calc_loss, 4),
+                "share_of_heat_pct": None if share is None else round(share, 2),
+            },
+            "meter_vs_calc": {
+                "paired_meter_kwh": round(self.state.cmp_meter_kwh, 3),
+                "paired_calc_kwh": round(self.state.cmp_calc_kwh, 3),
+                "deviation_pct": None if deviation is None else round(deviation, 2),
+                "calc_heat_since_last_meter_step_kwh": round(self.state.calc_heat_since_meter, 4),
+            },
+            "gaps": {
+                "gap_seconds_total": round(self._integrator.gap_seconds_total, 1),
+                "last_gap": self._integrator.last_gap_ts,
+            },
+            "cop_gross_status": cop_state,
+            "reference_cop": self.reference_cop(),
+        }
+
+    def reference_cop(self) -> float | None:
+        """Manufacturer COP at the current outdoor temperature (flow 35 degC).
+
+        Needs the outdoor temperature input and both reference values (COP at
+        -7 degC and at 2 degC); interpolated linearly and clamped outside.
+        """
+        cold = self.data.get(CONF_REF_COP_COLD)
+        warm = self.data.get(CONF_REF_COP_WARM)
+        outdoor = self.state.calc_latest.get("outdoor")
+        if not cold or not warm or outdoor is None:
+            return None
+        value = reference_cop(outdoor, ((-7.0, float(cold)), (2.0, float(warm))))
+        return None if value is None else round(value, 3)
 
     def _input_descriptor(self, entity_id: str) -> tuple[str, str, str] | None:
         """Return diagnostic role, configured unit and quantity kind for an input."""
@@ -489,6 +909,11 @@ class HeatPumpPerformanceRuntime:
                 "electrical_kwh": round(bucket.electrical, 6),
                 "aux_kwh": round(bucket.aux, 6),
                 "net_electrical_kwh": round(bucket.net_electrical, 6),
+                "effective_thermal_kwh": round(bucket.eff, 6),
+                "calc_heat_kwh": round(bucket.calc_heat, 6),
+                "calc_defrost_loss_kwh": round(bucket.calc_loss, 6),
+                "dhw_thermal_kwh": round(bucket.eff_dhw, 6),
+                "dhw_net_electrical_kwh": round(bucket.net_dhw, 6),
                 "period_start": bucket.start,
             }
             for name, bucket in (
@@ -499,6 +924,7 @@ class HeatPumpPerformanceRuntime:
                 ("heating_season", self.state.heating_season),
             )
         }
+        result["calculation"] = self.calc_diagnostics()
         return result
 
     async def _async_initial_year_backfill_if_needed(self) -> None:
@@ -553,6 +979,9 @@ class HeatPumpPerformanceRuntime:
                 aux_id = self.data[CONF_AUX_ENERGY]
                 self.state.yearly.aux = max(0.0, self.state.last_values.get(aux_id, 0.0) - baselines[aux_id])
             self.state.yearly.net_electrical_accum = self.state.yearly.electrical - self.state.yearly.aux
+            # History only contains meter counters, so the effective thermal
+            # energy of a back-filled year is the meter value in every mode.
+            self.state.yearly.eff = self.state.yearly.thermal
             self.state.yearly.start = start_local.isoformat()
             self.state.history_backfill_info = {
                 "status": "ok",
@@ -685,8 +1114,12 @@ class HeatPumpPerformanceRuntime:
         data = self.state.previous_day if name == "daily" else self.state.previous_month
         if not data:
             return None
-        return Bucket(**{k: data.get(k, 0.0 if k != "start" else None)
-                         for k in ("thermal", "electrical", "aux", "net_electrical_accum", "start")})
+        thermal = float(data.get("thermal", 0.0) or 0.0)
+        electrical = float(data.get("electrical", 0.0) or 0.0)
+        aux = float(data.get("aux", 0.0) or 0.0)
+        net = data.get("net_electrical_accum")
+        net = electrical - aux if net is None else float(net)
+        return _bucket_from_dict(data, thermal, electrical, aux, net)
 
     async def async_reset_balances(self, reset_spikes: bool) -> None:
         """Rebase all inputs to current valid readings and start new periods."""
@@ -708,12 +1141,22 @@ class HeatPumpPerformanceRuntime:
         self.state.last_values.clear()
         self.state.accepted_at.clear()
         self.state.diagnostic_deltas.clear()
+        self.state.cmp_meter_kwh = 0.0
+        self.state.cmp_calc_kwh = 0.0
+        self.state.calc_heat_since_meter = 0.0
+        self.state.calc_window_start_ts = None
+        self._integrator.reset()
         await self._seed_missing_last_values()
         for entity_id in self.state.last_values:
             self.state.accepted_at[entity_id] = now.isoformat()
         if reset_spikes:
             self.state.rejected_thermal_count = 0
             self.state.rejected_thermal_last = {}
+            self.state.sample_stats = PlausibilityStats()
+            self.state.increment_stats = PlausibilityStats()
+            self._defrost.count = 0
+            self._defrost.duration_s_total = 0.0
+            self._integrator.gap_seconds_total = 0.0
         self._refresh_quality()
         await self._save()
         self._notify()
@@ -744,6 +1187,16 @@ class HeatPumpPerformanceRuntime:
             "rejected_thermal_last": self.state.rejected_thermal_last,
             "previous_day": self.state.previous_day,
             "previous_month": self.state.previous_month,
+            "calc": {
+                "signature": self.state.calc_signature,
+                "cmp_meter_kwh": self.state.cmp_meter_kwh,
+                "cmp_calc_kwh": self.state.cmp_calc_kwh,
+                "sample_stats": self.state.sample_stats.to_dict(),
+                "increment_stats": self.state.increment_stats.to_dict(),
+                "defrost_count": self._defrost.count,
+                "defrost_duration_s": self._defrost.duration_s_total,
+                "gap_seconds_total": self._integrator.gap_seconds_total,
+            },
         }
 
     def _restore(self, data: dict[str, Any]) -> None:
@@ -766,13 +1219,7 @@ class HeatPumpPerformanceRuntime:
             setattr(
                 self.state,
                 name,
-                Bucket(
-                    thermal=thermal,
-                    electrical=electrical,
-                    aux=aux,
-                    net_electrical_accum=float(net),
-                    start=raw.get("start"),
-                ),
+                _bucket_from_dict(raw, thermal, electrical, aux, float(net)),
             )
         self.state.day_key = data.get("day_key")
         self.state.month_key = data.get("month_key")
@@ -788,9 +1235,45 @@ class HeatPumpPerformanceRuntime:
         self.state.rejected_thermal_last = dict(data.get("rejected_thermal_last", {}))
         self.state.previous_day = dict(data.get("previous_day", {}))
         self.state.previous_month = dict(data.get("previous_month", {}))
+        calc = dict(data.get("calc", {}) or {})
+        self.state.calc_signature = calc.get("signature")
+        self.state.cmp_meter_kwh = float(calc.get("cmp_meter_kwh", 0.0) or 0.0)
+        self.state.cmp_calc_kwh = float(calc.get("cmp_calc_kwh", 0.0) or 0.0)
+        self.state.sample_stats = PlausibilityStats.from_dict(calc.get("sample_stats"))
+        self.state.increment_stats = PlausibilityStats.from_dict(calc.get("increment_stats"))
+        self._defrost.count = int(calc.get("defrost_count", 0) or 0)
+        self._defrost.duration_s_total = float(calc.get("defrost_duration_s", 0.0) or 0.0)
+        self._integrator.gap_seconds_total = float(calc.get("gap_seconds_total", 0.0) or 0.0)
 
     async def _save(self) -> None:
+        self._last_save_ts = dt_util.now().timestamp()
         await self.store.async_save(self.snapshot())
+
+    async def _save_if_due(self, now: datetime) -> None:
+        """Persist self-calculated energy at most every SAVE_INTERVAL_S seconds."""
+        if now.timestamp() - self._last_save_ts >= SAVE_INTERVAL_S:
+            await self._save()
+
+
+def _bucket_from_dict(raw: dict[str, Any], thermal: float, electrical: float, aux: float, net: float) -> Bucket:
+    """Build a Bucket from stored data, migrating buckets saved before v0.2.0.
+
+    Before v0.2.0 the COP was always computed from the meter, so the effective
+    thermal energy (``eff``) of an old bucket equals its ``thermal`` value.
+    """
+    eff_raw = raw.get("eff")
+    return Bucket(
+        thermal=thermal,
+        electrical=electrical,
+        aux=aux,
+        net_electrical_accum=net,
+        start=raw.get("start"),
+        calc_heat=float(raw.get("calc_heat", 0.0) or 0.0),
+        calc_loss=float(raw.get("calc_loss", 0.0) or 0.0),
+        eff=thermal if eff_raw is None else float(eff_raw),
+        eff_dhw=float(raw.get("eff_dhw", 0.0) or 0.0),
+        net_dhw=float(raw.get("net_dhw", 0.0) or 0.0),
+    )
 
 
 def _state_float(state: State | None) -> float | None:
