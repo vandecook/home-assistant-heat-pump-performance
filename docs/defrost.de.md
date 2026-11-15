@@ -34,10 +34,22 @@ geteilt, damit Wärme und Verlust nicht vermischt werden.
 
 ## Abtauvorgang erkennen
 
-Ein Vorgang wird gezählt (`…_defrost_count`), wenn die Leistung mindestens **20 Sekunden
-lang unter −0,3 kW** liegt. Er endet, sobald die Leistung wieder 0 kW oder mehr beträgt.
-Kurze Einbrüche durch Sensorrauschen oder einen halb aktualisierten Messwert zählen nicht
-als Vorgang. Die Gesamtdauer aller Vorgänge steht im Attribut `duration_s_total`.
+Ein Vorgang wird gezählt (`…_defrost_count`), wenn der **Vorlauf mindestens 20 Sekunden
+lang um mehr als 0,5 K unter dem Rücklauf liegt**. Er endet, sobald der Vorlauf wieder auf
+oder über dem Rücklauf liegt oder der Durchfluss stoppt. Kurze Einbrüche durch
+Sensorrauschen oder einen halb aktualisierten Messwert zählen nicht als Vorgang. Die
+Gesamtdauer aller Vorgänge steht im Attribut `duration_s_total`.
+
+Beide Werte lassen sich in den Optionen einstellen (*Zeiträume, Grenzwerte und Berechnung*):
+
+| Einstellung | Standard | Bedeutung |
+| --- | --- | --- |
+| Abtauen: Vorlauf unter Rücklauf um mehr als (K) | 0,5 | Temperatur-Toleranz |
+| Abtauen: Mindestdauer (s) | 20 | Mindestdauer |
+
+Die Erkennung braucht einen gültigen Durchfluss (über dem eingestellten Mindestdurchfluss);
+ohne Durchfluss gilt „kein Abtauen". Sie nutzt nur die Temperaturdifferenz und hängt damit
+nicht davon ab, wie viel Wasser gerade fließt.
 
 Buchung und Erkennung sind getrennt: Jeder negative Leistungswert wird als Verlust
 gebucht, der Zähler reagiert aber nur auf anhaltende Einbrüche.
@@ -68,7 +80,7 @@ der berechneten Leistung gebucht, ein falsches oder fehlendes Signal verändert 
 Arbeitszahl also nie. Die Integration macht damit Folgendes:
 
 - Jeder gemeldete Vorgang wird geprüft: Haben die Wassertemperaturen das Abtauen gezeigt
-  (Leistung unter −0,3 kW, solange das Signal an war oder bis 2 Minuten danach)? Das
+  (Vorlauf unter Rücklauf um mehr als die Abtau-Schwelle, solange das Signal an war oder bis 2 Minuten danach)? Das
   Ergebnis wird als `confirmed_by_temperatures` oder `not_seen_in_temperatures` gezählt.
 - Aus den Temperaturen erkannte Vorgänge, die ohne das Signal beginnen, werden als
   `detected_without_flag` gezählt.

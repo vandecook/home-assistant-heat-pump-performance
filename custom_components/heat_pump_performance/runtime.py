@@ -59,6 +59,8 @@ from .const import (
     CONF_AUX_ENERGY,
     CONF_AUX_ENERGY_UNIT,
     CONF_DEFROST_ACTIVE,
+    CONF_DEFROST_DELTA_T,
+    CONF_DEFROST_MIN_DURATION,
     CONF_DHW_ACTIVE,
     CONF_ELECTRICAL_ENERGY,
     CONF_ELECTRICAL_ENERGY_UNIT,
@@ -216,8 +218,12 @@ class HeatPumpPerformanceRuntime:
         self._unsub: Callable[[], None] | None = None
         self._listeners: list[Callable[[], None]] = []
         self._integrator = ThermalIntegrator(max_gap_s=300.0)
-        self._defrost = DefrostDetector()
-        self._defrost_flag = DefrostFlagTracker()
+        defrost_k = float(self.data.get(CONF_DEFROST_DELTA_T, 0.5))
+        self._defrost = DefrostDetector(
+            threshold_k=defrost_k,
+            min_duration_s=float(self.data.get(CONF_DEFROST_MIN_DURATION, 20)),
+        )
+        self._defrost_flag = DefrostFlagTracker(threshold_k=defrost_k)
         self._calc_roles: dict[str, str] = self._build_calc_roles()
         self._unsub_tick: Callable[[], None] | None = None
         self._eval_unsub: Callable[[], None] | None = None
@@ -585,9 +591,15 @@ class HeatPumpPerformanceRuntime:
         else:
             self.state.sample_stats.record_ok(ts)
         heat, loss = self._integrator.step(ts, power)
-        started = self._defrost.update(ts, power)
+        if power is None:
+            defrost_delta = None
+        elif status == STATUS_IDLE:
+            defrost_delta = 0.0
+        else:
+            defrost_delta = latest["supply"] - latest["return"]
+        started = self._defrost.update(ts, defrost_delta)
         if self.data.get(CONF_DEFROST_ACTIVE):
-            self._defrost_flag.power_sample(ts, power, started)
+            self._defrost_flag.delta_sample(ts, defrost_delta, started)
         if heat or loss:
             self._book_calc_energy(heat, loss, now)
 
@@ -680,6 +692,8 @@ class HeatPumpPerformanceRuntime:
             "meter_increments": self.state.increment_stats.to_dict(),
             "defrost": {
                 "active": self._defrost.active,
+                "threshold_k": self._defrost.threshold_k,
+                "min_duration_s": self._defrost.min_duration_s,
                 "cycles": self._defrost.count,
                 "duration_s_total": round(self._defrost.duration_s_total, 1),
                 "loss_kwh_lifetime": round(life.calc_loss, 4),

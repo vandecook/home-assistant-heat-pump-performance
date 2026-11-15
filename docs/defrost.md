@@ -35,10 +35,22 @@ so heat and loss are not mixed up.
 
 ## Detecting a defrost cycle
 
-A cycle is counted (`…_defrost_count`) when the power stays below **−0.3 kW for at
-least 20 seconds**. It ends when the power is back at 0 kW or above. Short dips
-caused by sensor noise or a half-updated reading do not count as a cycle. The total
-duration of all cycles is available as the attribute `duration_s_total`.
+A cycle is counted (`…_defrost_count`) when the **supply temperature stays below the
+return temperature by more than 0.5 K for at least 20 seconds**. It ends when supply
+is back at or above return, or when the flow stops. Short dips caused by sensor noise
+or a half-updated reading do not count as a cycle. The total duration of all cycles is
+available as the attribute `duration_s_total`.
+
+Both values are settings in the options (*Periods, limits and calculation*):
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| Defrost: supply below return by more than (K) | 0.5 | temperature tolerance |
+| Defrost: must last at least (s) | 20 | minimum duration |
+
+The detection needs a valid flow (above the configured minimum flow); with no flow it
+treats the situation as "no defrost". It uses the temperature difference only, so it
+does not depend on how much water is flowing.
 
 Note that the energy booking and the cycle detection are separate: every negative
 power sample is booked as loss, while the counter only reacts to sustained dips.
@@ -69,8 +81,8 @@ calculated power, so wrong or missing flags never change the working ratio. What
 integration does with it:
 
 - Every flagged cycle is checked: did the water temperatures show the defrost
-  (power below −0.3 kW while the flag was on, or within 2 minutes after it went
-  off)? The result is counted as `confirmed_by_temperatures` or
+  (supply below return by more than the defrost threshold while the flag was on, or
+  within 2 minutes after it went off)? The result is counted as `confirmed_by_temperatures` or
   `not_seen_in_temperatures`.
 - Cycles detected from the temperatures that start without the flag are counted as
   `detected_without_flag`.

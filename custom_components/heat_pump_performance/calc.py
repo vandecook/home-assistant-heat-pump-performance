@@ -351,13 +351,15 @@ class ThermalIntegrator:
 class DefrostDetector:
     """Detect defrost cycles from sustained negative thermal power.
 
-    A cycle starts when power stays below ``-threshold_kw`` for at least
-    ``min_duration_s`` and ends once power is back above zero. Short dips caused
-    by sensor noise do not count.
+    The criterion is the temperature difference ``supply - return`` in kelvin: a
+    cycle starts when it stays below ``-threshold_k`` for at least
+    ``min_duration_s`` and ends once it is back at zero or above. Short dips caused
+    by sensor noise do not count. The caller passes ``None`` for invalid samples
+    and ``0.0`` for an idle flow (which therefore ends a cycle).
     """
 
-    def __init__(self, threshold_kw: float = 0.3, min_duration_s: float = 20.0) -> None:
-        self.threshold_kw = threshold_kw
+    def __init__(self, threshold_k: float = 0.5, min_duration_s: float = 20.0) -> None:
+        self.threshold_k = threshold_k
         self.min_duration_s = min_duration_s
         self.active = False
         self.count = 0
@@ -365,12 +367,12 @@ class DefrostDetector:
         self._below_since: float | None = None
         self._cycle_started: float | None = None
 
-    def update(self, ts: float, power_kw: float | None) -> bool:
+    def update(self, ts: float, delta_t_k: float | None) -> bool:
         """Feed a sample; return True when a new cycle was just confirmed."""
-        if power_kw is None:
+        if delta_t_k is None:
             return False
         started = False
-        if power_kw <= -self.threshold_kw:
+        if delta_t_k <= -self.threshold_k:
             if self._below_since is None:
                 self._below_since = ts
             if not self.active and ts - self._below_since >= self.min_duration_s:
@@ -378,7 +380,7 @@ class DefrostDetector:
                 self._cycle_started = self._below_since
                 self.count += 1
                 started = True
-        elif power_kw >= 0:
+        elif delta_t_k >= 0:
             if self.active and self._cycle_started is not None:
                 self.duration_s_total += max(0.0, ts - self._cycle_started)
             self.active = False
@@ -398,8 +400,8 @@ class DefrostFlagTracker:
     the flag are counted as well.
     """
 
-    def __init__(self, threshold_kw: float = 0.3, grace_s: float = DEFROST_FLAG_GRACE_S) -> None:
-        self.threshold_kw = threshold_kw
+    def __init__(self, threshold_k: float = 0.5, grace_s: float = DEFROST_FLAG_GRACE_S) -> None:
+        self.threshold_k = threshold_k
         self.grace_s = grace_s
         self.flag_on = False
         self.flag_cycles = 0
@@ -437,8 +439,8 @@ class DefrostFlagTracker:
             self._cycle_start = None
             self._last_off_ts = ts
 
-    def power_sample(self, ts: float, power_kw: float | None, cycle_started: bool) -> None:
-        negative = power_kw is not None and power_kw <= -self.threshold_kw
+    def delta_sample(self, ts: float, delta_t_k: float | None, cycle_started: bool) -> None:
+        negative = delta_t_k is not None and delta_t_k <= -self.threshold_k
         if self.flag_on:
             if negative:
                 self._seen_negative = True

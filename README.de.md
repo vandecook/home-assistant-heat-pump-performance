@@ -147,8 +147,8 @@ Ausführliche Erklärung: [docs/defrost.de.md](docs/defrost.de.md).
 Beim Abtauen entzieht die Wärmepumpe dem Heizwasser Wärme. Der Vorlauf fällt dann
 unter den Rücklauf, und die Leistung wird **negativ**. Das ist echte Energie und
 kein Sensorfehler. Sie wird als *Abtauverlust* getrennt gebucht und nicht auf null
-begrenzt. Ein Abtauvorgang wird erkannt, wenn die Leistung mindestens 20 s lang
-unter −0,3 kW liegt.
+begrenzt. Ein Abtauvorgang wird erkannt, wenn der Vorlauf mindestens 20 s lang
+um mehr als 0,5 K unter dem Rücklauf liegt (einstellbar in den Optionen).
 
 ### Optionaler Eingang „Abtauen aktiv"
 
@@ -157,8 +157,8 @@ Meldet deine Wärmepumpe, wann sie abtaut, wähle diese Entität (`binary_sensor
 Gegenprüfung: Die Energie wird weiterhin nach dem Vorzeichen der berechneten Leistung
 gebucht, das Signal ändert die Arbeitszahl also nie.
 
-- Jeder gemeldete Vorgang wird mit den Wassertemperaturen verglichen (Leistung unter
-  −0,3 kW, solange das Signal an ist oder bis 2 Minuten danach).
+- Jeder gemeldete Vorgang wird mit den Wassertemperaturen verglichen (Vorlauf unter dem
+  Rücklauf um mehr als die Abtau-Schwelle, solange das Signal an ist oder bis 2 Minuten danach).
 - Vorgänge, die in den Temperaturen ohne Signal zu sehen sind, werden ebenfalls gezählt.
 - Die Zähler stehen im Attribut `defrost.flag` von `…_plausibility`. Ab 5 Vorgängen
   warnt die Entität, wenn mehr als die Hälfte der gemeldeten Vorgänge in den
