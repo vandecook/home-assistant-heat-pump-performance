@@ -31,11 +31,16 @@ def _preview(runtime, correction_kwh: float, affected_at: datetime) -> dict:
         new_thermal = bucket.thermal - correction_kwh
         if new_thermal < -1e-6:
             raise ValueError(f"Correction exceeds {name} thermal balance")
+        # The false increment came from the heat meter. In the fully
+        # self-calculated mode the effective energy never contained it.
+        eff_correction = 0.0 if runtime.thermal_mode == "calculated" else correction_kwh
+        new_eff = bucket.eff - eff_correction
         result[name] = {
             "before_kwh": round(bucket.thermal, 6),
             "after_kwh": round(max(0.0, new_thermal), 6),
+            "after_effective_kwh": round(new_eff, 6),
             "before_az": bucket.az,
-            "after_az": max(0.0, new_thermal) / bucket.net_electrical if bucket.net_electrical > 0 and new_thermal > 0 else None,
+            "after_az": new_eff / bucket.net_electrical if bucket.net_electrical > 0 and new_eff > 0 else None,
         }
     if not result:
         raise ValueError("No affected periods found")
@@ -69,6 +74,7 @@ async def async_register_repair_services(hass: HomeAssistant) -> None:
         await backup.async_save(runtime.snapshot())
         for name, values in preview.items():
             runtime.bucket(name).thermal = values["after_kwh"]
+            runtime.bucket(name).eff = values["after_effective_kwh"]
         await runtime._save()
         runtime._notify()
         _LOGGER.warning("Heat Pump Performance repair APPLIED for %s; backup=%s; changes=%s", entry_id, backup_key, preview)

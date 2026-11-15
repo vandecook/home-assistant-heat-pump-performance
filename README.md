@@ -1,6 +1,6 @@
 # Heat Pump Performance
 
-**Current version: 0.1.14**
+**Current version: 0.2.0**
 
 Repository: https://github.com/vandecook/home-assistant-heat-pump-performance
 
@@ -213,6 +213,101 @@ This release updates integration metadata and documentation only. **There are no
 The release is intended to resolve the reported Hassfest `SERVICES`, `DEPENDENCIES`, and `MANIFEST` findings and the HACS brands check. **Final validation must still be confirmed by running the GitHub Actions workflow.**
 
 The `actions/checkout@v4` Node.js deprecation warning and runner-image migration notices belong to the GitHub Actions environment and are separate from the integration changes.
+
+## v0.2.0: Self-calculated heat, defrost and plausibility checks
+
+Everything below is optional and calculated inside the integration. No template
+sensors, helpers or utility meters are needed. Without the new inputs the
+integration behaves exactly like 0.1.14, and existing stored balances are
+migrated automatically.
+
+### New optional inputs
+
+- **Flow rate** of the heating circuit (unit selectable: m³/h, l/min, l/h)
+- **Supply (flow) temperature** and **return temperature**
+- **Outdoor temperature** (only for the manufacturer reference COP)
+
+Flow, supply and return must be configured together. The thermal power is
+
+`P [kW] = flow [m³/h] × 1.163 × (supply − return) [K]`
+
+and is integrated over time (trapezoid rule, exact split at zero crossings).
+
+### Defrost
+
+During a defrost the heat pump takes heat out of the heating water, so supply
+drops below return and the power becomes **negative**. This is real energy,
+not a sensor error. It is booked separately as *defrost loss* instead of being
+clipped to zero. A cycle is detected after the power stayed below −0.3 kW for
+at least 20 s.
+
+### Thermal mode (what feeds the COP)
+
+| Mode | Thermal energy used |
+| --- | --- |
+| `meter` (default) | heat meter counter, as in 0.1.14 |
+| `meter_minus_defrost` | heat meter minus the calculated defrost loss |
+| `calculated` | fully calculated, delivered heat minus defrost loss |
+
+The meter counter itself is always kept and still checked (spike filter).
+Without the three hydraulic inputs the mode falls back to `meter`.
+
+### Plausibility checks
+
+Every check is counted per reason and shown in the diagnostics.
+
+| Check | Rejects / warns when |
+| --- | --- |
+| Missing input | flow, supply or return unavailable |
+| Stale input | not reported for longer than the configured age (default 600 s, `0` disables) |
+| Temperature range | outside −30 … 100 °C |
+| Flow | negative, or above the maximum plausible flow (default 3 m³/h) |
+| Spread | \|supply − return\| above the limit (default 25 K) |
+| Power | \|power\| above maximum thermal power × safety factor |
+| Idle flow | flow below the minimum (default 0.1 m³/h): booked as 0 kW, not as an error |
+| Meter counter | decrease, or increase above what the hardware can deliver (unchanged) |
+| Meter vs. calculation | a meter step far ahead of the calculated heat is rejected (only judged over windows without data gaps) |
+| Meter deviation | warning above 10 % between meter and calculation (needs ≥ 10 kWh) |
+| Defrost share | warning above 25 % of the delivered heat |
+| COP range | warning when the lifetime gross COP is below 0.8 or above 8 (needs ≥ 2 kWh of electrical energy) |
+| Consecutive rejects | error after 20 rejected samples in a row |
+
+Rejected samples are never booked. A rejected sample or a gap longer than
+5 minutes breaks the integration chain; the missing interval is skipped, not
+extrapolated.
+
+Flow, supply and return normally arrive as separate state changes of the same
+device payload. They are therefore collected and evaluated once per second, so
+a half-updated combination is never judged. The calculation is also evaluated
+every 30 s with the last known values, so a constant reading keeps integrating.
+
+### New entities
+
+| Entity | Content |
+| --- | --- |
+| `…_cop_gross`, `_daily`, `_monthly`, `_yearly` | COP on the **complete** electrical energy (including controls and ventilation) |
+| `…_cop_heating`, `…_cop_dhw`, `…_spf_heating_yearly`, `…_spf_dhw_yearly` | working ratio split by the *domestic hot water active* flag (only with that flag configured) |
+| `…_calc_thermal_power` | signed thermal power in kW |
+| `…_calc_thermal_energy` | calculated delivered heat |
+| `…_defrost_energy` | calculated defrost loss |
+| `…_defrost_count` | detected defrost cycles |
+| `…_plausibility` | `inactive`, `ok`, `warning` or `error`, with all details as attributes |
+| `…_cop_reference` | manufacturer COP at the current outdoor temperature (needs outdoor temperature and the two reference values; valid for 35 °C flow) |
+
+The existing `…_input_diagnostics` entity now contains a `calculation` block
+with the same details, plus effective thermal energy, calculated heat and
+defrost loss per period.
+
+### Notes
+
+- The domestic hot water split books each energy step to the state of the flag
+  at that moment.
+- A back-filled initial year always uses the meter counter, because history only
+  contains meter values.
+- `repair_thermal_balance` corrects the effective thermal energy too, except in
+  the fully calculated mode, where the false meter increment was never part of it.
+- `reset_history` with `reset_spikes: true` also clears the plausibility
+  statistics and the defrost counter.
 
 ## Maintenance actions
 

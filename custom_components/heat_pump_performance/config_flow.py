@@ -21,14 +21,26 @@ from .const import (
     CONF_ELECTRICAL_ENERGY_UNIT,
     CONF_ELECTRICAL_POWER,
     CONF_ELECTRICAL_POWER_UNIT,
+    CONF_FLOW,
+    CONF_FLOW_UNIT,
     CONF_HEATING_ACTIVE,
     CONF_HEATING_SEASON_ENABLED,
     CONF_HEATING_SEASON_END,
     CONF_HEATING_SEASON_START,
     CONF_INITIAL_YEAR_DATE,
     CONF_INITIAL_YEAR_MODE,
+    CONF_MAX_DELTA_T,
+    CONF_MAX_FLOW,
+    CONF_MAX_INPUT_AGE,
+    CONF_MIN_FLOW,
     CONF_NAME,
+    CONF_OUTDOOR_TEMP,
+    CONF_REF_COP_COLD,
+    CONF_REF_COP_WARM,
+    CONF_RETURN_TEMP,
+    CONF_SUPPLY_TEMP,
     CONF_SYSTEM_TYPE,
+    CONF_THERMAL_MODE,
     CONF_THERMAL_ENERGY,
     CONF_THERMAL_ENERGY_UNIT,
     CONF_MAX_THERMAL_POWER,
@@ -36,9 +48,12 @@ from .const import (
     CONF_THERMAL_RESOLUTION,
     DOMAIN,
     ENERGY_UNITS,
+    FLOW_UNITS,
+    MODE_METER,
     POWER_UNITS,
     SYSTEM_HP,
     SYSTEM_TYPES,
+    THERMAL_MODES,
     YEAR_MODES,
     YEAR_PARTIAL,
 )
@@ -50,8 +65,13 @@ _OPTIONAL_INPUT_KEYS = (
     CONF_AUX_POWER,
     CONF_HEATING_ACTIVE,
     CONF_DHW_ACTIVE,
+    CONF_FLOW,
+    CONF_SUPPLY_TEMP,
+    CONF_RETURN_TEMP,
+    CONF_OUTDOOR_TEMP,
 )
 _OPTIONAL_UNIT_KEYS = (
+    CONF_FLOW_UNIT,
     CONF_ELECTRICAL_POWER_UNIT,
     CONF_AUX_ENERGY_UNIT,
     CONF_AUX_POWER_UNIT,
@@ -59,7 +79,10 @@ _OPTIONAL_UNIT_KEYS = (
 _OPTIONAL_PERIOD_KEYS = (
     CONF_HEATING_SEASON_START,
     CONF_HEATING_SEASON_END,
+    CONF_REF_COP_COLD,
+    CONF_REF_COP_WARM,
 )
+_CALC_INPUT_KEYS = (CONF_FLOW, CONF_SUPPLY_TEMP, CONF_RETURN_TEMP)
 
 
 def _set_optional_values(
@@ -97,6 +120,45 @@ def _operation_flag_selector() -> selector.EntitySelector:
     return selector.EntitySelector(selector.EntitySelectorConfig(multiple=False))
 
 
+def _calc_input_errors(data: dict[str, Any]) -> dict[str, str]:
+    """Flow, supply and return are only useful together."""
+    configured = [bool(data.get(key)) for key in _CALC_INPUT_KEYS]
+    if any(configured) and not all(configured):
+        return {"base": "calc_inputs_incomplete"}
+    return {}
+
+
+def _calc_settings_schema(data: dict[str, Any]) -> dict[Any, Any]:
+    """Settings of the self-calculation and its plausibility limits."""
+    def value(key: str, default: Any) -> Any:
+        return data.get(key, default)
+
+    schema: dict[Any, Any] = {
+        vol.Required(CONF_THERMAL_MODE, default=value(CONF_THERMAL_MODE, MODE_METER)): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=THERMAL_MODES,
+                mode=selector.SelectSelectorMode.DROPDOWN,
+                translation_key="thermal_mode",
+            )
+        ),
+        vol.Required(CONF_MIN_FLOW, default=value(CONF_MIN_FLOW, 0.1)): vol.All(vol.Coerce(float), vol.Range(min=0, max=100)),
+        vol.Required(CONF_MAX_FLOW, default=value(CONF_MAX_FLOW, 3.0)): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=1000)),
+        vol.Required(CONF_MAX_DELTA_T, default=value(CONF_MAX_DELTA_T, 25.0)): vol.All(vol.Coerce(float), vol.Range(min=1, max=100)),
+        vol.Required(CONF_MAX_INPUT_AGE, default=value(CONF_MAX_INPUT_AGE, 600)): vol.All(vol.Coerce(float), vol.Range(min=0, max=86400)),
+    }
+    for key in (CONF_REF_COP_COLD, CONF_REF_COP_WARM):
+        current = data.get(key)
+        marker = vol.Optional(key, default=current) if current not in (None, "") else vol.Optional(key)
+        schema[marker] = vol.All(vol.Coerce(float), vol.Range(min=0.5, max=10))
+    return schema
+
+
+def _validate_calc_settings(data: dict[str, Any], errors: dict[str, str]) -> None:
+    """A self-calculated thermal mode needs all three hydraulic inputs."""
+    if data.get(CONF_THERMAL_MODE, MODE_METER) != MODE_METER and not all(data.get(key) for key in _CALC_INPUT_KEYS):
+        errors[CONF_THERMAL_MODE] = "calc_inputs_required"
+
+
 class HeatPumpPerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow."""
 
@@ -107,11 +169,14 @@ class HeatPumpPerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         """Collect system identity and input entities."""
+        errors: dict[str, str] = {}
         if user_input is not None:
-            submitted = dict(user_input)
-            _set_optional_values(self._data, submitted, _OPTIONAL_INPUT_KEYS)
-            self._data.update(submitted)
-            return await self.async_step_units()
+            errors = _calc_input_errors(user_input)
+            if not errors:
+                submitted = dict(user_input)
+                _set_optional_values(self._data, submitted, _OPTIONAL_INPUT_KEYS)
+                self._data.update(submitted)
+                return await self.async_step_units()
 
         schema = vol.Schema(
             {
@@ -130,9 +195,15 @@ class HeatPumpPerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_AUX_POWER): _entity_selector(),
                 vol.Optional(CONF_HEATING_ACTIVE): _operation_flag_selector(),
                 vol.Optional(CONF_DHW_ACTIVE): _operation_flag_selector(),
+                vol.Optional(CONF_FLOW): _entity_selector(),
+                vol.Optional(CONF_SUPPLY_TEMP): _entity_selector(),
+                vol.Optional(CONF_RETURN_TEMP): _entity_selector(),
+                vol.Optional(CONF_OUTDOOR_TEMP): _entity_selector(),
             }
         )
-        return self.async_show_form(step_id="user", data_schema=schema)
+        if user_input:
+            schema = self.add_suggested_values_to_schema(schema, user_input)
+        return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
 
     async def async_step_units(self, user_input: dict[str, Any] | None = None):
         """Collect explicit units, independent of HA metadata."""
@@ -150,8 +221,11 @@ class HeatPumpPerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if user_input[CONF_INITIAL_YEAR_MODE] == YEAR_PARTIAL and not user_input.get(CONF_INITIAL_YEAR_DATE):
                 errors[CONF_INITIAL_YEAR_DATE] = "date_required"
             _validate_heating_season(user_input, errors)
+            _validate_calc_settings({**self._data, **user_input}, errors)
             if not errors:
-                self._data.update(user_input)
+                submitted = dict(user_input)
+                _set_optional_values(self._data, submitted, (CONF_REF_COP_COLD, CONF_REF_COP_WARM))
+                self._data.update(submitted)
                 return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
 
         schema = vol.Schema(
@@ -170,6 +244,7 @@ class HeatPumpPerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_HEATING_SEASON_ENABLED, default=False): selector.BooleanSelector(),
                 vol.Optional(CONF_HEATING_SEASON_START, default="10-01"): selector.TextSelector(),
                 vol.Optional(CONF_HEATING_SEASON_END, default="04-30"): selector.TextSelector(),
+                **_calc_settings_schema({}),
             }
         )
         return self.async_show_form(step_id="periods", data_schema=schema, errors=errors)
@@ -198,7 +273,10 @@ class HeatPumpPerformanceOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
         """Edit system identity and source entities."""
+        errors: dict[str, str] = {}
         if user_input is not None:
+            errors = _calc_input_errors(user_input)
+        if user_input is not None and not errors:
             # Rebuild optional entity settings from the submitted form.  Home
             # Assistant may represent a cleared EntitySelector either by omitting
             # the key or by submitting None/"".  In both cases the previous
@@ -211,6 +289,7 @@ class HeatPumpPerformanceOptionsFlow(config_entries.OptionsFlow):
                 CONF_ELECTRICAL_POWER: CONF_ELECTRICAL_POWER_UNIT,
                 CONF_AUX_ENERGY: CONF_AUX_ENERGY_UNIT,
                 CONF_AUX_POWER: CONF_AUX_POWER_UNIT,
+                CONF_FLOW: CONF_FLOW_UNIT,
             }
             for entity_key, unit_key in optional_units.items():
                 if not self._data.get(entity_key):
@@ -242,13 +321,17 @@ class HeatPumpPerformanceOptionsFlow(config_entries.OptionsFlow):
             (CONF_AUX_POWER, _entity_selector()),
             (CONF_HEATING_ACTIVE, _operation_flag_selector()),
             (CONF_DHW_ACTIVE, _operation_flag_selector()),
+            (CONF_FLOW, _entity_selector()),
+            (CONF_SUPPLY_TEMP, _entity_selector()),
+            (CONF_RETURN_TEMP, _entity_selector()),
+            (CONF_OUTDOOR_TEMP, _entity_selector()),
         )
         for key, entity_selector in optional_selectors:
             current = data.get(key)
             marker = vol.Optional(key, default=current) if current not in (None, "") else vol.Optional(key)
             schema_dict[marker] = entity_selector
 
-        return self.async_show_form(step_id="init", data_schema=vol.Schema(schema_dict))
+        return self.async_show_form(step_id="init", data_schema=vol.Schema(schema_dict), errors=errors)
 
     async def async_step_units(self, user_input: dict[str, Any] | None = None):
         """Edit units for the currently selected source entities."""
@@ -268,6 +351,7 @@ class HeatPumpPerformanceOptionsFlow(config_entries.OptionsFlow):
         errors: dict[str, str] = {}
         if user_input is not None:
             _validate_heating_season(user_input, errors)
+            _validate_calc_settings({**self._data, **user_input}, errors)
             if not errors:
                 submitted = dict(user_input)
                 enabled = bool(submitted.get(CONF_HEATING_SEASON_ENABLED, False))
@@ -278,7 +362,7 @@ class HeatPumpPerformanceOptionsFlow(config_entries.OptionsFlow):
                 # dates are conditionally required by validation above.
                 _set_optional_values(self._data, submitted, _OPTIONAL_PERIOD_KEYS)
                 if not enabled:
-                    for key in _OPTIONAL_PERIOD_KEYS:
+                    for key in (CONF_HEATING_SEASON_START, CONF_HEATING_SEASON_END):
                         self._data.pop(key, None)
 
                 self._data.update(submitted)
@@ -305,6 +389,10 @@ class HeatPumpPerformanceOptionsFlow(config_entries.OptionsFlow):
                     CONF_HEATING_SEASON_END,
                     default=self._data.get(CONF_HEATING_SEASON_END, "04-30"),
                 ): selector.TextSelector(),
+                vol.Required(CONF_MAX_THERMAL_POWER, default=self._data.get(CONF_MAX_THERMAL_POWER, 12.0)): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=1000)),
+                vol.Required(CONF_THERMAL_SAFETY_FACTOR, default=self._data.get(CONF_THERMAL_SAFETY_FACTOR, 1.2)): vol.All(vol.Coerce(float), vol.Range(min=1, max=10)),
+                vol.Required(CONF_THERMAL_RESOLUTION, default=self._data.get(CONF_THERMAL_RESOLUTION, 1.0)): vol.All(vol.Coerce(float), vol.Range(min=0, max=100)),
+                **_calc_settings_schema(self._data),
             }
         )
         return self.async_show_form(step_id="periods", data_schema=schema, errors=errors)
@@ -341,6 +429,13 @@ def _build_unit_schema(
             default=preferred(CONF_ELECTRICAL_ENERGY, CONF_ELECTRICAL_ENERGY_UNIT, ENERGY_UNITS, "kWh"),
         ): selector.SelectSelector(selector.SelectSelectorConfig(options=ENERGY_UNITS)),
     }
+    if data.get(CONF_FLOW):
+        schema_dict[
+            vol.Required(
+                CONF_FLOW_UNIT,
+                default=preferred(CONF_FLOW, CONF_FLOW_UNIT, FLOW_UNITS, "m³/h"),
+            )
+        ] = selector.SelectSelector(selector.SelectSelectorConfig(options=FLOW_UNITS))
     if data.get(CONF_ELECTRICAL_POWER):
         schema_dict[
             vol.Required(

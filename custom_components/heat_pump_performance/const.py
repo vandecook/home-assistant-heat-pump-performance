@@ -59,3 +59,29 @@ QUALITY_HISTORY_UNAVAILABLE = "history_unavailable"
 CONF_MAX_THERMAL_POWER = "max_thermal_power_kw"
 CONF_THERMAL_SAFETY_FACTOR = "thermal_safety_factor"
 CONF_THERMAL_RESOLUTION = "thermal_resolution_kwh"
+
+# Self-calculated heat from flow and flow/return temperatures (v0.2.0).
+CONF_FLOW = "flow_rate"
+CONF_FLOW_UNIT = "flow_rate_unit"
+CONF_SUPPLY_TEMP = "supply_temp"
+CONF_RETURN_TEMP = "return_temp"
+CONF_OUTDOOR_TEMP = "outdoor_temp"
+CONF_THERMAL_MODE = "thermal_mode"
+CONF_MIN_FLOW = "min_flow_m3h"
+CONF_MAX_FLOW = "max_flow_m3h"
+CONF_MAX_DELTA_T = "max_delta_t"
+CONF_MAX_ELECTRICAL_POWER = "max_electrical_power_kw"
+CONF_MAX_INPUT_AGE = "max_input_age_s"
+CONF_REF_COP_COLD = "ref_cop_cold"
+CONF_REF_COP_WARM = "ref_cop_warm"
+
+# Which thermal energy feeds the COP:
+#   meter               - the heat meter counter (behaviour of <= 0.1.14)
+#   meter_minus_defrost - meter counter minus the self-calculated defrost loss
+#   calculated          - fully self-calculated, signed (heat minus defrost loss)
+MODE_METER = "meter"
+MODE_METER_MINUS_DEFROST = "meter_minus_defrost"
+MODE_CALCULATED = "calculated"
+THERMAL_MODES = [MODE_METER, MODE_METER_MINUS_DEFROST, MODE_CALCULATED]
+
+FLOW_UNITS = ["m³/h", "l/min", "l/h"]
