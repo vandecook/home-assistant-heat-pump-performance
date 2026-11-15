@@ -80,6 +80,27 @@ usually the more accurate figure. The comparison between both is shown in the
 diagnostics, so you can decide on your own data. Recommended: start with `meter`,
 watch the plausibility entity for a few days, then switch.
 
+### Comparing heat meter and calculation
+
+Three sensors show how far the heat meter and the calculation are apart
+(positive = the meter shows more heat than the calculation):
+
+| Sensor | Compares |
+| --- | --- |
+| `…_meter_deviation_daily` | today's meter energy with today's calculated heat |
+| `…_meter_deviation` | meter and calculation over the windows in which both were booked for the *same* time span (lifetime); this is the figure behind the plausibility warning |
+| `…_calc_thermal_energy_daily` | the calculated heat of today, for a side-by-side tile next to `…_thermal_energy_daily` |
+
+Things to keep in mind:
+
+- `…_calc_thermal_energy` is a **lifetime total** and never resets. Do not compare
+  it with the daily meter value; use the `_daily` sensors.
+- Both deviation sensors stay *unknown* below 10 kWh of calculated heat, because
+  a meter that counts in whole kWh says little over smaller amounts.
+- A deviation above 10 % raises a warning in `…_plausibility`.
+- Over a few days differences of 1 to 2 % are normal for a 1 kWh meter. Judge the
+  trend over several days, not a single value.
+
 ## Working ratios
 
 - **Net** working ratio: effective thermal energy divided by the electrical

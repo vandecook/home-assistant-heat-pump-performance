@@ -83,6 +83,29 @@ Werte steht in der Diagnose, damit du auf Basis deiner eigenen Daten entscheiden
 kannst. Empfehlung: mit `meter` starten, die Plausibilitäts-Entität einige Tage
 beobachten und dann umstellen.
 
+### Vergleich Wärmemengenzähler und Berechnung
+
+Drei Sensoren zeigen, wie weit Wärmemengenzähler und Berechnung auseinanderliegen
+(positiv = der Zähler zeigt mehr Wärme als die Berechnung):
+
+| Sensor | Vergleicht |
+| --- | --- |
+| `…_meter_deviation_daily` | Zählerenergie von heute mit der berechneten Wärme von heute |
+| `…_meter_deviation` | Zähler und Berechnung über die Fenster, in denen beide für *denselben* Zeitraum gebucht wurden (Gesamtzeit); das ist der Wert hinter der Plausibilitätswarnung |
+| `…_calc_thermal_energy_daily` | die berechnete Wärme von heute, für eine Kachel neben `…_thermal_energy_daily` |
+
+Gut zu wissen:
+
+- `…_calc_thermal_energy` ist eine **Gesamtsumme** und wird nie zurückgesetzt.
+  Vergleiche sie nicht mit dem Tageswert des Zählers, sondern nimm die
+  `_daily`-Sensoren.
+- Beide Abweichungs-Sensoren bleiben *unbekannt*, solange weniger als 10 kWh
+  berechnete Wärme vorliegen, weil ein Zähler in ganzen kWh über kleinere Mengen
+  wenig aussagt.
+- Eine Abweichung über 10 % löst eine Warnung in `…_plausibility` aus.
+- Über wenige Tage sind 1 bis 2 % Unterschied bei einem 1-kWh-Zähler normal.
+  Beurteile den Verlauf über mehrere Tage, nicht einen einzelnen Wert.
+
 ## Arbeitszahlen
 
 - **Netto**-Arbeitszahl: effektive Wärmeenergie geteilt durch die elektrische
