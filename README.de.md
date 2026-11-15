@@ -217,9 +217,34 @@ erhalten.
 
 ## Installation
 
-Über HACS: das Repository als benutzerdefiniertes Repository hinzufügen (Kategorie
-*Integration*), installieren, Home Assistant neu starten und **Heat Pump
-Performance** unter *Einstellungen > Geräte & Dienste* hinzufügen.
+### Schnellinstallation (Marketplace / HACS)
+
+1. Öffne das Repository in deinem Marketplace oder HACS:
+   [![Öffnet deine Home-Assistant-Instanz und das Repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=vandecook&repository=home-assistant-heat-pump-performance&category=integration)
+2. Klicke auf **Herunterladen** und wähle die neueste Version.
+3. **Home Assistant neu starten.**
+4. Gehe zu *Einstellungen > Geräte & Dienste > Integration hinzufügen*, suche
+   **Heat Pump Performance** und folge dem Dialog.
+5. Wähle deine Energiezähler (Wärme- und elektrische Energie sind Pflicht).
+   Durchfluss, Vor- und Rücklauftemperatur sind optional und aktivieren die
+   berechnete Wärme.
+
+### Schritt für Schritt ohne Button
+
+- **Home Assistant 2026.11 oder neuer:** *Einstellungen > Marketplace* öffnen
+  (HACS ist eingebaut). Dieses Repository als benutzerdefiniertes Repository
+  (Kategorie *Integration*) hinzufügen, falls es noch nicht gelistet ist:
+  `https://github.com/vandecook/home-assistant-heat-pump-performance`.
+- **Ältere Versionen mit HACS:** *HACS > ⋮ > Benutzerdefinierte Repositories*, die
+  URL oben eintragen, Kategorie *Integration*, dann herunterladen.
+- **Manuell:** den Ordner `custom_components/heat_pump_performance` aus diesem
+  Repository in den Ordner `custom_components` deiner Home-Assistant-Konfiguration
+  kopieren und neu starten.
+
+Nach einem Update einmal Home Assistant neu starten; deine gespeicherten Summen
+bleiben erhalten.
+
+### Beta installieren
 
 HACS bietet nur Releases (und den Standard-Branch) an, keine Feature-Branches. Um
 eine Beta zu testen, veröffentlichst du auf GitHub ein Release, das als
