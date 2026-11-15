@@ -150,6 +150,25 @@ kein Sensorfehler. Sie wird als *Abtauverlust* getrennt gebucht und nicht auf nu
 begrenzt. Ein Abtauvorgang wird erkannt, wenn die Leistung mindestens 20 s lang
 unter −0,3 kW liegt.
 
+### Optionaler Eingang „Abtauen aktiv"
+
+Meldet deine Wärmepumpe, wann sie abtaut, wähle diese Entität (`binary_sensor`,
+`switch`, `input_boolean`, …) als **Abtauen aktiv** aus. Das ist nur eine
+Gegenprüfung: Die Energie wird weiterhin nach dem Vorzeichen der berechneten Leistung
+gebucht, das Signal ändert die Arbeitszahl also nie.
+
+- Jeder gemeldete Vorgang wird mit den Wassertemperaturen verglichen (Leistung unter
+  −0,3 kW, solange das Signal an ist oder bis 2 Minuten danach).
+- Vorgänge, die in den Temperaturen ohne Signal zu sehen sind, werden ebenfalls gezählt.
+- Die Zähler stehen im Attribut `defrost.flag` von `…_plausibility`. Ab 5 Vorgängen
+  warnt die Entität, wenn mehr als die Hälfte der gemeldeten Vorgänge in den
+  Temperaturen nicht zu sehen ist oder mehr als die Hälfte aller Vorgänge ohne Signal
+  beginnt.
+- Ein Signal, das dauernd an ist (zum Beispiel eine „Eisüberwachung"), zeigt sich als
+  Warnung. Prüfe also, was deine Entität wirklich bedeutet.
+
+Details: [docs/defrost.de.md](docs/defrost.de.md).
+
 ## Plausibilitätsprüfungen und Diagnose
 
 Jede Prüfung wird je Grund gezählt und in der Diagnose angezeigt.

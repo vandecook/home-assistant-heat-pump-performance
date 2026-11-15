@@ -142,6 +142,24 @@ sensor error. It is booked separately as *defrost loss* instead of being clipped
 to zero. A cycle is detected after the power stayed below −0.3 kW for at least
 20 s.
 
+### Optional "Defrost active" input
+
+If your heat pump reports when it defrosts, select that entity (`binary_sensor`,
+`switch`, `input_boolean`, …) as **Defrost active**. It is a cross check only: the
+energy is still booked from the sign of the calculated power, so the signal never
+changes the working ratio.
+
+- Each flagged cycle is checked against the water temperatures (power below −0.3 kW
+  while the flag is on or within 2 minutes after it went off).
+- Cycles seen in the temperatures without the flag are counted too.
+- The counters are in the attribute `defrost.flag` of `…_plausibility`. With at least
+  5 cycles the entity warns when more than half of the flagged cycles are not seen in
+  the temperatures, or more than half of all cycles start without the flag.
+- A flag that is on all the time (for example an "ice monitoring" state) shows up as a
+  warning, so check what your entity really means.
+
+Details: [docs/defrost.md](docs/defrost.md).
+
 ## Plausibility checks and diagnostics
 
 Every check is counted per reason and shown in the diagnostics.
