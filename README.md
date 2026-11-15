@@ -298,6 +298,35 @@ The existing `…_input_diagnostics` entity now contains a `calculation` block
 with the same details, plus effective thermal energy, calculated heat and
 defrost loss per period.
 
+### Gross and net working ratio
+
+- **Net** (`…_working_ratio…`): effective thermal energy divided by the
+  electrical energy *without* controls and ventilation (as before).
+- **Gross** (`…_cop_gross…`): the same thermal energy divided by the *complete*
+  electrical energy. This is the value to compare with manufacturer COP figures
+  (EN 14511).
+
+### Outdoor temperature and reference COP
+
+The outdoor temperature is used only for `…_cop_reference`; it has no effect on
+any calculated value. Prefer the heat pump's own outdoor sensor, because the
+manufacturer figures refer to the air temperature at the unit. Use a weather
+station only if the unit's sensor is slow, in the sun or affected by exhaust air,
+and place it close to the unit in the shade.
+
+The pre-filled reference values (COP 2.7 at -7 °C and 3.3 at 2 °C, both at 35 °C
+flow) are taken from the LWZ 303 Integral data. Check them against the data sheet
+of your own unit and change them in the options if they differ. They are a
+comparison value only. Measured values also contain defrost, part load and
+domestic hot water, so they are not directly comparable to a test-bench figure.
+
+### Installing a beta through HACS
+
+HACS offers only releases (and the default branch), not feature branches. To test
+a beta, publish a GitHub release marked as *pre-release*, switch on *Show beta
+versions* for the integration in HACS and redownload that version. Back up Home
+Assistant first and restart it afterwards.
+
 ### Notes
 
 - The domestic hot water split books each energy step to the state of the flag
