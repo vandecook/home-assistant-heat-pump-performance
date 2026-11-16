@@ -36,7 +36,7 @@ so heat and loss are not mixed up.
 ## Detecting a defrost cycle
 
 A cycle is counted (`…_defrost_count`) when the **supply temperature stays below the
-return temperature by more than 0.5 K for at least 20 seconds**. It ends when supply
+return temperature by more than 0.5 K for at least 60 seconds**. It ends when supply
 is back at or above return, or when the flow stops. Short dips caused by sensor noise
 or a half-updated reading do not count as a cycle. The total duration of all cycles is
 available as the attribute `duration_s_total`.
@@ -46,7 +46,7 @@ Both values are settings in the options (*Periods, limits and calculation*):
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | Defrost: supply below return by more than (K) | 0.5 | temperature tolerance |
-| Defrost: must last at least (s) | 20 | minimum duration |
+| Defrost: must last at least (s) | 60 | minimum duration |
 
 The detection needs a valid flow (above the configured minimum flow); with no flow it
 treats the situation as "no defrost". It uses the temperature difference only, so it

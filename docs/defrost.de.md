@@ -34,7 +34,7 @@ geteilt, damit Wärme und Verlust nicht vermischt werden.
 
 ## Abtauvorgang erkennen
 
-Ein Vorgang wird gezählt (`…_defrost_count`), wenn der **Vorlauf mindestens 20 Sekunden
+Ein Vorgang wird gezählt (`…_defrost_count`), wenn der **Vorlauf mindestens 60 Sekunden
 lang um mehr als 0,5 K unter dem Rücklauf liegt**. Er endet, sobald der Vorlauf wieder auf
 oder über dem Rücklauf liegt oder der Durchfluss stoppt. Kurze Einbrüche durch
 Sensorrauschen oder einen halb aktualisierten Messwert zählen nicht als Vorgang. Die
@@ -45,7 +45,7 @@ Beide Werte lassen sich in den Optionen einstellen (*Zeiträume, Grenzwerte und 
 | Einstellung | Standard | Bedeutung |
 | --- | --- | --- |
 | Abtauen: Vorlauf unter Rücklauf um mehr als (K) | 0,5 | Temperatur-Toleranz |
-| Abtauen: Mindestdauer (s) | 20 | Mindestdauer |
+| Abtauen: Mindestdauer (s) | 60 | Mindestdauer |
 
 Die Erkennung braucht einen gültigen Durchfluss (über dem eingestellten Mindestdurchfluss);
 ohne Durchfluss gilt „kein Abtauen". Sie nutzt nur die Temperaturdifferenz und hängt damit

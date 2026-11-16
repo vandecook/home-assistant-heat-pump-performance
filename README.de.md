@@ -147,7 +147,7 @@ Ausführliche Erklärung: [docs/defrost.de.md](docs/defrost.de.md).
 Beim Abtauen entzieht die Wärmepumpe dem Heizwasser Wärme. Der Vorlauf fällt dann
 unter den Rücklauf, und die Leistung wird **negativ**. Das ist echte Energie und
 kein Sensorfehler. Sie wird als *Abtauverlust* getrennt gebucht und nicht auf null
-begrenzt. Ein Abtauvorgang wird erkannt, wenn der Vorlauf mindestens 20 s lang
+begrenzt. Ein Abtauvorgang wird erkannt, wenn der Vorlauf mindestens 60 s lang
 um mehr als 0,5 K unter dem Rücklauf liegt (einstellbar in den Optionen).
 
 ### Optionaler Eingang „Abtauen aktiv"

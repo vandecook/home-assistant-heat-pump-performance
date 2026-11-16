@@ -358,7 +358,7 @@ class DefrostDetector:
     and ``0.0`` for an idle flow (which therefore ends a cycle).
     """
 
-    def __init__(self, threshold_k: float = 0.5, min_duration_s: float = 20.0) -> None:
+    def __init__(self, threshold_k: float = 0.5, min_duration_s: float = 60.0) -> None:
         self.threshold_k = threshold_k
         self.min_duration_s = min_duration_s
         self.active = False
