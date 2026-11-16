@@ -85,7 +85,9 @@ integration does with it:
   within 2 minutes after it went off)? The result is counted as `confirmed_by_temperatures` or
   `not_seen_in_temperatures`.
 - Cycles detected from the temperatures that start without the flag are counted as
-  `detected_without_flag`.
+  `detected_without_flag`. The status of the heat pump may arrive a little later than
+  the temperatures react, so a flag that turns on up to 2 minutes after the detection
+  is matched to it and is not counted as a mismatch.
 - Everything is shown in the attribute `defrost.flag` of `…_plausibility` and kept
   across restarts. `reset_history` with `reset_spikes: true` clears it.
 - With at least 5 cycles the plausibility entity warns when more than half of the

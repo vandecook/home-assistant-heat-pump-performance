@@ -83,7 +83,9 @@ Arbeitszahl also nie. Die Integration macht damit Folgendes:
   (Vorlauf unter Rücklauf um mehr als die Abtau-Schwelle, solange das Signal an war oder bis 2 Minuten danach)? Das
   Ergebnis wird als `confirmed_by_temperatures` oder `not_seen_in_temperatures` gezählt.
 - Aus den Temperaturen erkannte Vorgänge, die ohne das Signal beginnen, werden als
-  `detected_without_flag` gezählt.
+  `detected_without_flag` gezählt. Der Status der WP kommt oft etwas später als die
+  Temperaturen reagieren: Ein Signal, das bis zu 2 Minuten nach der Erkennung
+  einschaltet, wird ihr zugeordnet und nicht als Abweichung gezählt.
 - Alles steht im Attribut `defrost.flag` von `…_plausibility` und bleibt über Neustarts
   erhalten. `reset_history` mit `reset_spikes: true` setzt es zurück.
 - Ab 5 Vorgängen warnt die Plausibilitäts-Entität, wenn mehr als die Hälfte der

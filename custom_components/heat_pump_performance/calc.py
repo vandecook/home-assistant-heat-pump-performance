@@ -413,6 +413,7 @@ class DefrostFlagTracker:
         self._seen_negative = False
         self._last_off_ts: float | None = None
         self._last_unconfirmed = False
+        self._pending_detected: float | None = None
 
     def seed(self, ts: float, on: bool) -> None:
         """Take over the current flag state at startup without counting a cycle."""
@@ -422,10 +423,16 @@ class DefrostFlagTracker:
 
     def flag_changed(self, ts: float, on: bool) -> None:
         if on and not self.flag_on:
+            if self._pending_detected is not None and ts - self._pending_detected <= self.grace_s:
+                # The flag arrived a little after the temperatures showed the defrost.
+                self._pending_detected = None
+                late = True
+            else:
+                late = False
             self.flag_on = True
             self.flag_cycles += 1
             self._cycle_start = ts
-            self._seen_negative = False
+            self._seen_negative = late
         elif not on and self.flag_on:
             self.flag_on = False
             if self._cycle_start is not None:
@@ -441,6 +448,14 @@ class DefrostFlagTracker:
 
     def delta_sample(self, ts: float, delta_t_k: float | None, cycle_started: bool) -> None:
         negative = delta_t_k is not None and delta_t_k <= -self.threshold_k
+        if (
+            self._pending_detected is not None
+            and not self.flag_on
+            and ts - self._pending_detected > self.grace_s
+        ):
+            # No flag followed within the tolerance: now it counts as without flag.
+            self.detected_without_flag += 1
+            self._pending_detected = None
         if self.flag_on:
             if negative:
                 self._seen_negative = True
@@ -451,8 +466,8 @@ class DefrostFlagTracker:
             self.unconfirmed = max(0, self.unconfirmed - 1)
             self.confirmed += 1
             self._last_unconfirmed = False
-        if cycle_started and not in_grace:
-            self.detected_without_flag += 1
+        if cycle_started and not in_grace and self._pending_detected is None:
+            self._pending_detected = ts
 
     def warnings(self) -> list[str]:
         out: list[str] = []
@@ -491,6 +506,7 @@ class DefrostFlagTracker:
         self.confirmed = 0
         self.unconfirmed = 0
         self.detected_without_flag = 0
+        self._pending_detected = None
 
 
 def reference_cop(outdoor_c: float, points: tuple[tuple[float, float], ...]) -> float | None:
