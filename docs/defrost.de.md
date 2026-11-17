@@ -97,6 +97,30 @@ Ein Signal, das dauernd `on` ist (zum Beispiel eine „Eisüberwachung", die kei
 Abtausignal ist), erzeugt viele unbestätigte Vorgänge und zeigt sich als Warnung. Prüfe,
 was deine Entität wirklich bedeutet, bevor du dich darauf verlässt.
 
+### Quelle für Anzahl und Dauer wählen
+
+Mit der Einstellung **Abtauen: Quelle für Anzahl und Dauer** legst du fest, woher
+`…_defrost_count` und seine Attribute kommen:
+
+- **Berechnet** (Standard): aus der Temperaturerkennung (Schwelle und Mindestdauer
+  oben).
+- **Signal der Wärmepumpe**: Jedes Einschalten des Eingangs „Abtauen aktiv“ zählt als
+  ein Vorgang, die Dauer ist die Zeit, in der das Signal an war, und `active` folgt dem
+  Signal. Dafür ist der Eingang „Abtauen aktiv“ nötig; ohne ihn lehnt das
+  Optionsformular die Auswahl ab.
+
+Der jeweils andere Wert bleibt sichtbar (`calculated_cycles`, `calculated_active`),
+die Gegenprüfung läuft weiter. Mit dem WP-Signal folgt auch die **Verlustbuchung dem Signal**: Negative Leistung wird
+nur als Abtauverlust gebucht, solange das Signal an ist (und bis zu 2 Minuten nach dem
+Ausschalten). Negative Energie, die auftritt, während das Signal noch aus ist, wird
+zurückgehalten; schaltet das Signal innerhalb von 2 Minuten ein, wird sie **ab Beginn der
+negativen Phase** nachgebucht. Folgt kein Signal, wird sie verworfen und als
+`ignored_loss_kwh` in `defrost` von `…_plausibility` angezeigt (`pending_loss_kwh` ist die
+aktuell zurückgehaltene Menge). Es wird angenommen, dass das Signal immer kommt; einen
+Rückfall auf die berechnete Erkennung bei nicht verfügbarer Entität gibt es nicht. Bei der
+Quelle *berechnet* ist der Verlust wie bisher immer der negative Teil der berechneten
+Leistung.
+
 ## Was du in Home Assistant siehst
 
 | Entität | Inhalt |

@@ -458,14 +458,16 @@ class HeatPumpDefrostCountSensor(HeatPumpBaseSensor):
 
     @property
     def native_value(self):
-        return self.runtime._defrost.count
+        return self.runtime.defrost_count
 
     @property
     def extra_state_attributes(self):
-        defrost = self.runtime._defrost
+        runtime = self.runtime
         return {
-            "active": defrost.active,
-            "duration_s_total": round(defrost.duration_s_total, 1),
+            "source": "heat_pump" if runtime.defrost_from_heat_pump else "calculated",
+            "active": runtime.defrost_active,
+            "duration_s_total": round(runtime.defrost_duration_s, 1),
+            "calculated_cycles": runtime._defrost.count,
         }
 
 

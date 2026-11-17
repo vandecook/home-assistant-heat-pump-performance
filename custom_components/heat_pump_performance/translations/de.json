@@ -15,7 +15,7 @@
           "aux_power": "Elektrische Leistung Steuerung und Wohnraumlüftung",
           "heating_active": "Heizbetrieb aktiv",
           "dhw_active": "Warmwasseraufbereitung aktiv",
-          "defrost_active": "Abtauen aktiv (optional, nur zur Gegenprüfung der erkannten Abtauvorgänge)",
+          "defrost_active": "Abtauen aktiv (optional: Gegenprüfung oder Quelle für die Abtauanzahl)",
           "flow_rate": "Durchfluss Heizkreis",
           "supply_temp": "Vorlauftemperatur",
           "return_temp": "Rücklauftemperatur",
@@ -51,6 +51,7 @@
           "max_flow_m3h": "Maximal plausibler Durchfluss (m³/h)",
           "max_delta_t": "Maximal plausible Spreizung Vor-/Rücklauf (K)",
           "max_input_age_s": "Eingang gilt nach (s) als veraltet, 0 = nie",
+          "defrost_source": "Abtauen: Quelle für Anzahl und Dauer",
           "defrost_delta_t": "Abtauen: Vorlauf unter Rücklauf um mehr als (K)",
           "defrost_min_duration_s": "Abtauen: Mindestdauer (s)",
           "ref_cop_cold": "Hersteller-COP bei -7 °C Außen / 35 °C Vorlauf",
@@ -62,6 +63,7 @@
       "date_required": "Für Teiljahr muss ein Startdatum gewählt werden.",
       "invalid_mm_dd": "Format MM-TT verwenden, z. B. 10-01.",
       "calc_inputs_incomplete": "Durchfluss, Vorlauf- und Rücklauftemperatur müssen gemeinsam angegeben werden.",
+      "defrost_flag_required": "Die Quelle Wärmepumpe benötigt den Eingang „Abtauen aktiv“.",
       "calc_inputs_required": "Dieser Modus benötigt Durchfluss, Vorlauf- und Rücklauftemperatur."
     }
   },
@@ -94,6 +96,7 @@
           "max_flow_m3h": "Maximal plausibler Durchfluss (m³/h)",
           "max_delta_t": "Maximal plausible Spreizung Vor-/Rücklauf (K)",
           "max_input_age_s": "Eingang gilt nach (s) als veraltet, 0 = nie",
+          "defrost_source": "Abtauen: Quelle für Anzahl und Dauer",
           "defrost_delta_t": "Abtauen: Vorlauf unter Rücklauf um mehr als (K)",
           "defrost_min_duration_s": "Abtauen: Mindestdauer (s)",
           "ref_cop_cold": "Hersteller-COP bei -7 °C Außen / 35 °C Vorlauf",
@@ -111,6 +114,7 @@
     },
     "error": {
       "calc_inputs_incomplete": "Durchfluss, Vorlauf- und Rücklauftemperatur müssen gemeinsam angegeben werden.",
+      "defrost_flag_required": "Die Quelle Wärmepumpe benötigt den Eingang „Abtauen aktiv“.",
       "calc_inputs_required": "Dieser Modus benötigt Durchfluss, Vorlauf- und Rücklauftemperatur."
     }
   },
@@ -127,6 +131,9 @@
         "full_year": "Gesamtes Jahr ab 1. Januar (wenn Recorder-Historie verfügbar)",
         "partial_year": "Teiljahr ab gewähltem Datum"
       }
+    },
+    "defrost_source": {
+      "options": {"calculated": "Berechnet aus Vorlauf-/Rücklauftemperatur", "heat_pump": "Signal der Wärmepumpe (Eingang „Abtauen aktiv“)"}
     },
     "thermal_mode": {
       "options": {

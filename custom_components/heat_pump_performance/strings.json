@@ -15,7 +15,7 @@
           "aux_power": "Electrical power - controls and ventilation",
           "heating_active": "Heating active",
           "dhw_active": "Domestic hot water active",
-          "defrost_active": "Defrost active (optional, only for cross-checking the detected defrost)",
+          "defrost_active": "Defrost active (optional: cross-check or source of the defrost count)",
           "flow_rate": "Flow rate - heating circuit",
           "supply_temp": "Supply (flow) temperature",
           "return_temp": "Return temperature",
@@ -51,6 +51,7 @@
           "max_flow_m3h": "Maximum plausible flow (m³/h)",
           "max_delta_t": "Maximum plausible supply/return difference (K)",
           "max_input_age_s": "Input is stale after (s, 0 = never)",
+          "defrost_source": "Defrost: source for count and duration",
           "defrost_delta_t": "Defrost: supply below return by more than (K)",
           "defrost_min_duration_s": "Defrost: must last at least (s)",
           "ref_cop_cold": "Manufacturer COP at -7 °C outdoor / 35 °C flow",
@@ -62,6 +63,7 @@
       "date_required": "Select a date for partial year.",
       "invalid_mm_dd": "Use MM-DD, for example 10-01.",
       "calc_inputs_incomplete": "Flow rate, supply temperature and return temperature must be set together.",
+      "defrost_flag_required": "The heat pump source needs the \"Defrost active\" input.",
       "calc_inputs_required": "This mode needs flow rate, supply temperature and return temperature."
     }
   },
@@ -80,7 +82,7 @@
           "aux_power": "Electrical power - controls and ventilation",
           "heating_active": "Heating active",
           "dhw_active": "Domestic hot water active",
-          "defrost_active": "Defrost active (optional, only for cross-checking the detected defrost)",
+          "defrost_active": "Defrost active (optional: cross-check or source of the defrost count)",
           "flow_rate": "Flow rate - heating circuit",
           "supply_temp": "Supply (flow) temperature",
           "return_temp": "Return temperature",
@@ -114,6 +116,7 @@
           "max_flow_m3h": "Maximum plausible flow (m³/h)",
           "max_delta_t": "Maximum plausible supply/return difference (K)",
           "max_input_age_s": "Input is stale after (s, 0 = never)",
+          "defrost_source": "Defrost: source for count and duration",
           "defrost_delta_t": "Defrost: supply below return by more than (K)",
           "defrost_min_duration_s": "Defrost: must last at least (s)",
           "ref_cop_cold": "Manufacturer COP at -7 °C outdoor / 35 °C flow",
@@ -123,6 +126,7 @@
     },
     "error": {
       "calc_inputs_incomplete": "Flow rate, supply temperature and return temperature must be set together.",
+      "defrost_flag_required": "The heat pump source needs the \"Defrost active\" input.",
       "calc_inputs_required": "This mode needs flow rate, supply temperature and return temperature."
     }
   },
@@ -139,6 +143,9 @@
         "full_year": "Full year (January 1, if Recorder history is available)",
         "partial_year": "Partial year from selected date"
       }
+    },
+    "defrost_source": {
+      "options": {"calculated": "Calculated from supply/return temperatures", "heat_pump": "Signal of the heat pump (Defrost active input)"}
     },
     "thermal_mode": {
       "options": {

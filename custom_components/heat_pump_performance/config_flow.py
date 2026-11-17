@@ -19,6 +19,10 @@ from .const import (
     CONF_DEFROST_ACTIVE,
     CONF_DEFROST_DELTA_T,
     CONF_DEFROST_MIN_DURATION,
+    CONF_DEFROST_SOURCE,
+    DEFROST_SOURCE_CALCULATED,
+    DEFROST_SOURCE_HEAT_PUMP,
+    DEFROST_SOURCES,
     CONF_DHW_ACTIVE,
     CONF_ELECTRICAL_ENERGY,
     CONF_ELECTRICAL_ENERGY_UNIT,
@@ -149,6 +153,13 @@ def _calc_settings_schema(data: dict[str, Any]) -> dict[Any, Any]:
         vol.Required(CONF_MAX_FLOW, default=value(CONF_MAX_FLOW, 3.0)): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=1000)),
         vol.Required(CONF_MAX_DELTA_T, default=value(CONF_MAX_DELTA_T, 25.0)): vol.All(vol.Coerce(float), vol.Range(min=1, max=100)),
         vol.Required(CONF_MAX_INPUT_AGE, default=value(CONF_MAX_INPUT_AGE, 600)): vol.All(vol.Coerce(float), vol.Range(min=0, max=86400)),
+        vol.Required(CONF_DEFROST_SOURCE, default=value(CONF_DEFROST_SOURCE, DEFROST_SOURCE_CALCULATED)): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=DEFROST_SOURCES,
+                mode=selector.SelectSelectorMode.DROPDOWN,
+                translation_key="defrost_source",
+            )
+        ),
         vol.Required(CONF_DEFROST_DELTA_T, default=value(CONF_DEFROST_DELTA_T, 0.5)): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=10)),
         vol.Required(CONF_DEFROST_MIN_DURATION, default=value(CONF_DEFROST_MIN_DURATION, 60)): vol.All(vol.Coerce(float), vol.Range(min=5, max=600)),
     }
@@ -163,6 +174,8 @@ def _validate_calc_settings(data: dict[str, Any], errors: dict[str, str]) -> Non
     """A self-calculated thermal mode needs all three hydraulic inputs."""
     if data.get(CONF_THERMAL_MODE, MODE_METER) != MODE_METER and not all(data.get(key) for key in _CALC_INPUT_KEYS):
         errors[CONF_THERMAL_MODE] = "calc_inputs_required"
+    if data.get(CONF_DEFROST_SOURCE) == DEFROST_SOURCE_HEAT_PUMP and not data.get(CONF_DEFROST_ACTIVE):
+        errors[CONF_DEFROST_SOURCE] = "defrost_flag_required"
 
 
 class HeatPumpPerformanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
