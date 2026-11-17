@@ -221,7 +221,7 @@ class HeatPumpPerformanceRuntime:
         defrost_k = float(self.data.get(CONF_DEFROST_DELTA_T, 0.5))
         self._defrost = DefrostDetector(
             threshold_k=defrost_k,
-            min_duration_s=float(self.data.get(CONF_DEFROST_MIN_DURATION, 20)),
+            min_duration_s=float(self.data.get(CONF_DEFROST_MIN_DURATION, 60)),
         )
         self._defrost_flag = DefrostFlagTracker(threshold_k=defrost_k)
         self._calc_roles: dict[str, str] = self._build_calc_roles()

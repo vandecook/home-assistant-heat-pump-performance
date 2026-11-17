@@ -226,6 +226,8 @@ def test_defrost_flag_late_reaction_within_grace_confirms():
 def test_detected_cycle_without_flag_is_counted_outside_grace_only():
     t = _tracker()
     t.delta_sample(1000, -2.0, True)
+    assert t.detected_without_flag == 0  # waits for a late flag
+    t.delta_sample(1200, -2.0, False)  # tolerance passed, no flag
     assert t.detected_without_flag == 1
     t.flag_changed(2000, True)
     t.flag_changed(2100, False)
@@ -256,3 +258,13 @@ def test_defrost_flag_persistence_roundtrip():
     assert u.to_dict()["cycles"] == 4 and u.confirmed == 3 and u.detected_without_flag == 2
     u.reset()
     assert u.flag_cycles == 0 and u.unconfirmed == 0
+
+
+def test_late_flag_after_detection_is_not_counted_and_confirms():
+    t = _tracker()
+    t.delta_sample(1000, -2.0, True)
+    t.flag_changed(1060, True)  # status arrives a bit later
+    t.flag_changed(1200, False)
+    t.delta_sample(1300, 2.0, False)
+    assert t.detected_without_flag == 0
+    assert (t.flag_cycles, t.confirmed, t.unconfirmed) == (1, 1, 0)

@@ -34,7 +34,7 @@ geteilt, damit Wärme und Verlust nicht vermischt werden.
 
 ## Abtauvorgang erkennen
 
-Ein Vorgang wird gezählt (`…_defrost_count`), wenn der **Vorlauf mindestens 20 Sekunden
+Ein Vorgang wird gezählt (`…_defrost_count`), wenn der **Vorlauf mindestens 60 Sekunden
 lang um mehr als 0,5 K unter dem Rücklauf liegt**. Er endet, sobald der Vorlauf wieder auf
 oder über dem Rücklauf liegt oder der Durchfluss stoppt. Kurze Einbrüche durch
 Sensorrauschen oder einen halb aktualisierten Messwert zählen nicht als Vorgang. Die
@@ -45,7 +45,7 @@ Beide Werte lassen sich in den Optionen einstellen (*Zeiträume, Grenzwerte und 
 | Einstellung | Standard | Bedeutung |
 | --- | --- | --- |
 | Abtauen: Vorlauf unter Rücklauf um mehr als (K) | 0,5 | Temperatur-Toleranz |
-| Abtauen: Mindestdauer (s) | 20 | Mindestdauer |
+| Abtauen: Mindestdauer (s) | 60 | Mindestdauer |
 
 Die Erkennung braucht einen gültigen Durchfluss (über dem eingestellten Mindestdurchfluss);
 ohne Durchfluss gilt „kein Abtauen". Sie nutzt nur die Temperaturdifferenz und hängt damit
@@ -83,7 +83,9 @@ Arbeitszahl also nie. Die Integration macht damit Folgendes:
   (Vorlauf unter Rücklauf um mehr als die Abtau-Schwelle, solange das Signal an war oder bis 2 Minuten danach)? Das
   Ergebnis wird als `confirmed_by_temperatures` oder `not_seen_in_temperatures` gezählt.
 - Aus den Temperaturen erkannte Vorgänge, die ohne das Signal beginnen, werden als
-  `detected_without_flag` gezählt.
+  `detected_without_flag` gezählt. Der Status der WP kommt oft etwas später als die
+  Temperaturen reagieren: Ein Signal, das bis zu 2 Minuten nach der Erkennung
+  einschaltet, wird ihr zugeordnet und nicht als Abweichung gezählt.
 - Alles steht im Attribut `defrost.flag` von `…_plausibility` und bleibt über Neustarts
   erhalten. `reset_history` mit `reset_spikes: true` setzt es zurück.
 - Ab 5 Vorgängen warnt die Plausibilitäts-Entität, wenn mehr als die Hälfte der

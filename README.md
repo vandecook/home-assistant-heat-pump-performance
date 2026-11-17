@@ -141,7 +141,7 @@ drops below return and the power becomes **negative**. This is real energy, not 
 sensor error. It is booked separately as *defrost loss* instead of being clipped
 to zero. A cycle is detected after supply stayed below return by more than
 0.5 K (setting *Defrost: supply below return by more than*) for at least
-20 s.
+60 s.
 
 ### Optional "Defrost active" input
 
