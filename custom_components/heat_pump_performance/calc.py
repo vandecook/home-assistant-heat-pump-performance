@@ -446,6 +446,11 @@ class DefrostFlagTracker:
             self._cycle_start = None
             self._last_off_ts = ts
 
+    def duration_running_s(self, ts: float) -> float:
+        """Total flagged time including a cycle that is still running."""
+        running = max(0.0, ts - self._cycle_start) if self.flag_on and self._cycle_start is not None else 0.0
+        return self.flag_duration_s + running
+
     def delta_sample(self, ts: float, delta_t_k: float | None, cycle_started: bool) -> None:
         negative = delta_t_k is not None and delta_t_k <= -self.threshold_k
         if (

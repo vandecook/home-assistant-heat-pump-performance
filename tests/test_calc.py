@@ -268,3 +268,11 @@ def test_late_flag_after_detection_is_not_counted_and_confirms():
     t.delta_sample(1300, 2.0, False)
     assert t.detected_without_flag == 0
     assert (t.flag_cycles, t.confirmed, t.unconfirmed) == (1, 1, 0)
+
+
+def test_flag_duration_includes_running_cycle():
+    t = _tracker()
+    t.flag_changed(0, True)
+    assert t.duration_running_s(90) == 90
+    t.flag_changed(100, False)
+    assert t.duration_running_s(500) == 100

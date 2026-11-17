@@ -61,6 +61,8 @@ from .const import (
     CONF_DEFROST_ACTIVE,
     CONF_DEFROST_DELTA_T,
     CONF_DEFROST_MIN_DURATION,
+    CONF_DEFROST_SOURCE,
+    DEFROST_SOURCE_HEAT_PUMP,
     CONF_DHW_ACTIVE,
     CONF_ELECTRICAL_ENERGY,
     CONF_ELECTRICAL_ENERGY_UNIT,
@@ -228,6 +230,28 @@ class HeatPumpPerformanceRuntime:
         self._unsub_tick: Callable[[], None] | None = None
         self._eval_unsub: Callable[[], None] | None = None
         self._last_save_ts: float = 0.0
+
+    @property
+    def defrost_from_heat_pump(self) -> bool:
+        """True when the defrost count comes from the heat pump's own signal."""
+        return (
+            self.data.get(CONF_DEFROST_SOURCE) == DEFROST_SOURCE_HEAT_PUMP
+            and bool(self.data.get(CONF_DEFROST_ACTIVE))
+        )
+
+    @property
+    def defrost_count(self) -> int:
+        return self._defrost_flag.flag_cycles if self.defrost_from_heat_pump else self._defrost.count
+
+    @property
+    def defrost_active(self) -> bool:
+        return self._defrost_flag.flag_on if self.defrost_from_heat_pump else self._defrost.active
+
+    @property
+    def defrost_duration_s(self) -> float:
+        if self.defrost_from_heat_pump:
+            return self._defrost_flag.duration_running_s(dt_util.now().timestamp())
+        return self._defrost.duration_s_total
 
     async def async_setup(self) -> None:
         """Restore state and start tracking inputs."""
@@ -691,11 +715,14 @@ class HeatPumpPerformanceRuntime:
             "samples": self.state.sample_stats.to_dict(),
             "meter_increments": self.state.increment_stats.to_dict(),
             "defrost": {
-                "active": self._defrost.active,
+                "source": "heat_pump" if self.defrost_from_heat_pump else "calculated",
+                "active": self.defrost_active,
+                "calculated_active": self._defrost.active,
                 "threshold_k": self._defrost.threshold_k,
                 "min_duration_s": self._defrost.min_duration_s,
-                "cycles": self._defrost.count,
-                "duration_s_total": round(self._defrost.duration_s_total, 1),
+                "cycles": self.defrost_count,
+                "duration_s_total": round(self.defrost_duration_s, 1),
+                "calculated_cycles": self._defrost.count,
                 "loss_kwh_lifetime": round(life.calc_loss, 4),
                 "share_of_heat_pct": None if share is None else round(share, 2),
                 "flag": self._defrost_flag.to_dict() if self.data.get(CONF_DEFROST_ACTIVE) else None,

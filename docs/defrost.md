@@ -99,6 +99,23 @@ A flag that is `on` all the time (for example an "ice monitoring" state that is 
 real defrost signal) produces many unconfirmed cycles and shows up as a warning. Check
 what your entity really means before relying on it.
 
+### Choosing the source for count and duration
+
+With the setting **Defrost: source for count and duration** you decide where
+`…_defrost_count` and its attributes come from:
+
+- **Calculated** (default): from the temperature detection (threshold and minimum
+  duration above).
+- **Signal of the heat pump**: every switch-on of the "Defrost active" input counts as
+  one cycle, the duration is the time the signal was on, and `active` follows the
+  signal. This needs the "Defrost active" input; the options form refuses it without.
+
+The other value stays visible (`calculated_cycles`, `calculated_active`) and the
+cross check keeps running. The energy booking is **not** affected: the defrost loss
+is always the negative part of the calculated power, because that is the heat that
+really flowed back. With the heat pump signal the count can therefore differ from the
+cycles in which loss energy was booked.
+
 ## What you see in Home Assistant
 
 | Entity | Content |

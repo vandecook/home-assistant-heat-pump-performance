@@ -97,6 +97,24 @@ Ein Signal, das dauernd `on` ist (zum Beispiel eine „Eisüberwachung", die kei
 Abtausignal ist), erzeugt viele unbestätigte Vorgänge und zeigt sich als Warnung. Prüfe,
 was deine Entität wirklich bedeutet, bevor du dich darauf verlässt.
 
+### Quelle für Anzahl und Dauer wählen
+
+Mit der Einstellung **Abtauen: Quelle für Anzahl und Dauer** legst du fest, woher
+`…_defrost_count` und seine Attribute kommen:
+
+- **Berechnet** (Standard): aus der Temperaturerkennung (Schwelle und Mindestdauer
+  oben).
+- **Signal der Wärmepumpe**: Jedes Einschalten des Eingangs „Abtauen aktiv“ zählt als
+  ein Vorgang, die Dauer ist die Zeit, in der das Signal an war, und `active` folgt dem
+  Signal. Dafür ist der Eingang „Abtauen aktiv“ nötig; ohne ihn lehnt das
+  Optionsformular die Auswahl ab.
+
+Der jeweils andere Wert bleibt sichtbar (`calculated_cycles`, `calculated_active`),
+die Gegenprüfung läuft weiter. Die Energiebuchung ist **nicht** betroffen: Der
+Abtauverlust ist immer der negative Teil der berechneten Leistung, denn das ist die
+Wärme, die wirklich zurückgeflossen ist. Mit dem WP-Signal kann die Anzahl daher von
+den Vorgängen abweichen, in denen Verlustenergie gebucht wurde.
+
 ## Was du in Home Assistant siehst
 
 | Entität | Inhalt |

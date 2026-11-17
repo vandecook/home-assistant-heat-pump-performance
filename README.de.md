@@ -155,7 +155,10 @@ um mehr als 0,5 K unter dem Rücklauf liegt (einstellbar in den Optionen).
 Meldet deine Wärmepumpe, wann sie abtaut, wähle diese Entität (`binary_sensor`,
 `switch`, `input_boolean`, …) als **Abtauen aktiv** aus. Das ist nur eine
 Gegenprüfung: Die Energie wird weiterhin nach dem Vorzeichen der berechneten Leistung
-gebucht, das Signal ändert die Arbeitszahl also nie.
+gebucht, das Signal ändert die Arbeitszahl also nie. Steht die Einstellung **Abtauen: Quelle für Anzahl und Dauer**
+auf *Signal der Wärmepumpe*, liefert das Signal auch Anzahl, Dauer und den Zustand
+„aktiv“ (`…_defrost_count`); die Temperaturerkennung dient dann nur noch zur
+Gegenprüfung. Standard ist *berechnet*.
 
 - Jeder gemeldete Vorgang wird mit den Wassertemperaturen verglichen (Vorlauf unter dem
   Rücklauf um mehr als die Abtau-Schwelle, solange das Signal an ist oder bis 2 Minuten danach).
