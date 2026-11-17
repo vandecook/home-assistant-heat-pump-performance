@@ -110,10 +110,16 @@ Mit der Einstellung **Abtauen: Quelle für Anzahl und Dauer** legst du fest, woh
   Optionsformular die Auswahl ab.
 
 Der jeweils andere Wert bleibt sichtbar (`calculated_cycles`, `calculated_active`),
-die Gegenprüfung läuft weiter. Die Energiebuchung ist **nicht** betroffen: Der
-Abtauverlust ist immer der negative Teil der berechneten Leistung, denn das ist die
-Wärme, die wirklich zurückgeflossen ist. Mit dem WP-Signal kann die Anzahl daher von
-den Vorgängen abweichen, in denen Verlustenergie gebucht wurde.
+die Gegenprüfung läuft weiter. Mit dem WP-Signal folgt auch die **Verlustbuchung dem Signal**: Negative Leistung wird
+nur als Abtauverlust gebucht, solange das Signal an ist (und bis zu 2 Minuten nach dem
+Ausschalten). Negative Energie, die auftritt, während das Signal noch aus ist, wird
+zurückgehalten; schaltet das Signal innerhalb von 2 Minuten ein, wird sie **ab Beginn der
+negativen Phase** nachgebucht. Folgt kein Signal, wird sie verworfen und als
+`ignored_loss_kwh` in `defrost` von `…_plausibility` angezeigt (`pending_loss_kwh` ist die
+aktuell zurückgehaltene Menge). Es wird angenommen, dass das Signal immer kommt; einen
+Rückfall auf die berechnete Erkennung bei nicht verfügbarer Entität gibt es nicht. Bei der
+Quelle *berechnet* ist der Verlust wie bisher immer der negative Teil der berechneten
+Leistung.
 
 ## Was du in Home Assistant siehst
 

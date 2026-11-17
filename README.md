@@ -151,7 +151,8 @@ energy is still booked from the sign of the calculated power, so the signal neve
 changes the working ratio. With the setting **Defrost: source for count and duration**
 set to *Signal of the heat pump*, the signal also provides the defrost count, the
 duration and the "active" state (`…_defrost_count`); the temperature detection then
-only serves as the cross check. Default is *calculated*.
+only serves as the cross check, and the defrost loss is booked only while the signal is
+on (negative energy before the signal is booked afterwards). Default is *calculated*.
 
 - Each flagged cycle is checked against the water temperatures (supply below return
   by more than the defrost threshold while the flag is on or within 2 minutes after
@@ -335,7 +336,7 @@ reset time.
 ## Changelog
 
 - **0.2.2**: Defrost minimum duration default 60 s; tolerance for a late heat pump
-  signal; new setting to take the defrost count and duration from the heat pump signal.
+  signal; new setting to take the defrost count, duration and loss booking from the heat pump signal.
 - **0.2.0**: Self-calculated heat from flow and temperatures, signed power and
   defrost detection, thermal modes, plausibility checks with diagnostic entity,
   gross COP, heating/DHW split, manufacturer reference COP, outdoor temperature,

@@ -26,6 +26,7 @@ from .calc import (
     STATUS_STALE,
     DefrostDetector,
     DefrostFlagTracker,
+    LossGate,
     PlausibilityStats,
     SampleLimits,
     ThermalIntegrator,
@@ -226,6 +227,7 @@ class HeatPumpPerformanceRuntime:
             min_duration_s=float(self.data.get(CONF_DEFROST_MIN_DURATION, 60)),
         )
         self._defrost_flag = DefrostFlagTracker(threshold_k=defrost_k)
+        self._loss_gate = LossGate()
         self._calc_roles: dict[str, str] = self._build_calc_roles()
         self._unsub_tick: Callable[[], None] | None = None
         self._eval_unsub: Callable[[], None] | None = None
@@ -333,7 +335,12 @@ class HeatPumpPerformanceRuntime:
 
         if self.data.get(CONF_DEFROST_ACTIVE) and entity_id == self.data[CONF_DEFROST_ACTIVE]:
             if new_state is not None and new_state.state.lower() not in ("unavailable", "unknown"):
-                self._defrost_flag.flag_changed(now.timestamp(), bool(self.is_on(entity_id)))
+                on = bool(self.is_on(entity_id))
+                self._defrost_flag.flag_changed(now.timestamp(), on)
+                if on and self.defrost_from_heat_pump:
+                    released = self._loss_gate.flush()
+                    if released:
+                        self._book_calc_energy(0.0, released, now)
             self._notify()
             return
 
@@ -624,6 +631,8 @@ class HeatPumpPerformanceRuntime:
         started = self._defrost.update(ts, defrost_delta)
         if self.data.get(CONF_DEFROST_ACTIVE):
             self._defrost_flag.delta_sample(ts, defrost_delta, started)
+        if self.defrost_from_heat_pump:
+            loss = self._loss_gate.add(ts, loss, self._defrost_flag.booking_open(ts))
         if heat or loss:
             self._book_calc_energy(heat, loss, now)
 
@@ -716,6 +725,8 @@ class HeatPumpPerformanceRuntime:
             "meter_increments": self.state.increment_stats.to_dict(),
             "defrost": {
                 "source": "heat_pump" if self.defrost_from_heat_pump else "calculated",
+                "ignored_loss_kwh": round(self._loss_gate.ignored_kwh, 4),
+                "pending_loss_kwh": round(self._loss_gate.pending_kwh, 4),
                 "active": self.defrost_active,
                 "calculated_active": self._defrost.active,
                 "threshold_k": self._defrost.threshold_k,
@@ -1215,6 +1226,7 @@ class HeatPumpPerformanceRuntime:
             self._defrost.count = 0
             self._defrost.duration_s_total = 0.0
             self._defrost_flag.reset()
+            self._loss_gate.reset()
             self._integrator.gap_seconds_total = 0.0
         self._refresh_quality()
         await self._save()
@@ -1255,6 +1267,7 @@ class HeatPumpPerformanceRuntime:
                 "defrost_count": self._defrost.count,
                 "defrost_duration_s": self._defrost.duration_s_total,
                 "defrost_flag": self._defrost_flag.to_dict(),
+                "defrost_ignored_loss_kwh": self._loss_gate.ignored_kwh,
                 "gap_seconds_total": self._integrator.gap_seconds_total,
             },
         }
@@ -1304,6 +1317,7 @@ class HeatPumpPerformanceRuntime:
         self._defrost.count = int(calc.get("defrost_count", 0) or 0)
         self._defrost.duration_s_total = float(calc.get("defrost_duration_s", 0.0) or 0.0)
         self._defrost_flag.restore(calc.get("defrost_flag"))
+        self._loss_gate.ignored_kwh = float(calc.get("defrost_ignored_loss_kwh", 0.0) or 0.0)
         self._integrator.gap_seconds_total = float(calc.get("gap_seconds_total", 0.0) or 0.0)
 
     async def _save(self) -> None:

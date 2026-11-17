@@ -276,3 +276,29 @@ def test_flag_duration_includes_running_cycle():
     assert t.duration_running_s(90) == 90
     t.flag_changed(100, False)
     assert t.duration_running_s(500) == 100
+
+
+def test_loss_gate_books_backlog_when_signal_arrives_late():
+    g = calc.LossGate(grace_s=120)
+    assert g.add(0, 0.01, False) == 0.0
+    assert g.add(30, 0.01, False) == 0.0
+    assert g.pending_kwh == 0.02
+    assert abs(g.flush() - 0.02) < 1e-9  # signal turned on: booked from the start
+    assert g.add(60, 0.01, True) == 0.01
+
+
+def test_loss_gate_drops_loss_without_signal_after_grace():
+    g = calc.LossGate(grace_s=120)
+    g.add(0, 0.05, False)
+    assert g.add(200, 0.0, False) == 0.0
+    assert g.pending_kwh == 0.0
+    assert abs(g.ignored_kwh - 0.05) < 1e-9
+
+
+def test_booking_open_during_flag_and_grace_after():
+    t = _tracker()
+    assert not t.booking_open(0)
+    t.flag_changed(10, True)
+    assert t.booking_open(50)
+    t.flag_changed(100, False)
+    assert t.booking_open(200) and not t.booking_open(300)

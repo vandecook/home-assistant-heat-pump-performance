@@ -389,6 +389,51 @@ class DefrostDetector:
         return started
 
 
+class LossGate:
+    """Book defrost loss only while the heat pump reports a defrost.
+
+    Negative energy that appears while the signal is still off is held back. If the
+    signal turns on within ``grace_s`` the held energy is booked from the start of
+    the negative period; otherwise it is dropped and counted as ignored.
+    """
+
+    def __init__(self, grace_s: float = DEFROST_FLAG_GRACE_S) -> None:
+        self.grace_s = grace_s
+        self.ignored_kwh = 0.0
+        self._pending: list[tuple[float, float]] = []
+
+    @property
+    def pending_kwh(self) -> float:
+        return sum(v for _, v in self._pending)
+
+    def expire(self, ts: float) -> None:
+        keep = []
+        for t, v in self._pending:
+            if ts - t > self.grace_s:
+                self.ignored_kwh += v
+            else:
+                keep.append((t, v))
+        self._pending = keep
+
+    def add(self, ts: float, loss_kwh: float, is_open: bool) -> float:
+        """Return the loss to book now (including a released backlog)."""
+        self.expire(ts)
+        if is_open:
+            return loss_kwh + self.flush()
+        if loss_kwh > 0:
+            self._pending.append((ts, loss_kwh))
+        return 0.0
+
+    def flush(self) -> float:
+        total = self.pending_kwh
+        self._pending = []
+        return total
+
+    def reset(self) -> None:
+        self.ignored_kwh = 0.0
+        self._pending = []
+
+
 class DefrostFlagTracker:
     """Compare an optional "defrost active" signal of the heat pump with the
     defrost detected from negative thermal power.
@@ -445,6 +490,12 @@ class DefrostFlagTracker:
                 self._last_unconfirmed = True
             self._cycle_start = None
             self._last_off_ts = ts
+
+    def booking_open(self, ts: float) -> bool:
+        """True while the signal is on or went off less than the grace period ago."""
+        if self.flag_on:
+            return True
+        return self._last_off_ts is not None and ts - self._last_off_ts <= self.grace_s
 
     def duration_running_s(self, ts: float) -> float:
         """Total flagged time including a cycle that is still running."""

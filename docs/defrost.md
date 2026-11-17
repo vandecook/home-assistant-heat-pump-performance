@@ -111,10 +111,15 @@ With the setting **Defrost: source for count and duration** you decide where
   signal. This needs the "Defrost active" input; the options form refuses it without.
 
 The other value stays visible (`calculated_cycles`, `calculated_active`) and the
-cross check keeps running. The energy booking is **not** affected: the defrost loss
-is always the negative part of the calculated power, because that is the heat that
-really flowed back. With the heat pump signal the count can therefore differ from the
-cycles in which loss energy was booked.
+cross check keeps running. With the heat pump signal the **loss booking follows the signal** as well: negative
+power is booked as defrost loss only while the signal is on (and up to 2 minutes after
+it went off). Negative energy that appears while the signal is still off is held back;
+when the signal turns on within 2 minutes, it is booked **from the start of the negative
+period**. If no signal follows, that energy is dropped and shown as `ignored_loss_kwh`
+in `defrost` of `…_plausibility` (`pending_loss_kwh` is what is currently held back).
+It is assumed that the signal always arrives; there is no fallback to the calculated
+detection if the entity is unavailable. With the source *calculated* the loss is always
+the negative part of the calculated power, as before.
 
 ## What you see in Home Assistant
 

@@ -158,7 +158,8 @@ Gegenprüfung: Die Energie wird weiterhin nach dem Vorzeichen der berechneten Le
 gebucht, das Signal ändert die Arbeitszahl also nie. Steht die Einstellung **Abtauen: Quelle für Anzahl und Dauer**
 auf *Signal der Wärmepumpe*, liefert das Signal auch Anzahl, Dauer und den Zustand
 „aktiv“ (`…_defrost_count`); die Temperaturerkennung dient dann nur noch zur
-Gegenprüfung. Standard ist *berechnet*.
+Gegenprüfung, und der Abtauverlust wird nur gebucht, solange das Signal an ist
+(negative Energie vor dem Signal wird nachgebucht). Standard ist *berechnet*.
 
 - Jeder gemeldete Vorgang wird mit den Wassertemperaturen verglichen (Vorlauf unter dem
   Rücklauf um mehr als die Abtau-Schwelle, solange das Signal an ist oder bis 2 Minuten danach).
