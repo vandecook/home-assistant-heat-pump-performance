@@ -335,6 +335,9 @@ reset time.
 
 ## Changelog
 
+- **0.2.3**: The diagnostic attributes of `…_plausibility` now contain
+  `integration_version`, `ha_version` and a `config` block (configured entities,
+  limits, defrost settings), so a copied dump is self-contained.
 - **0.2.2**: Defrost minimum duration default 60 s; tolerance for a late heat pump
   signal; new setting to take the defrost count, duration and loss booking from the heat pump signal.
 - **0.2.0**: Self-calculated heat from flow and temperatures, signed power and

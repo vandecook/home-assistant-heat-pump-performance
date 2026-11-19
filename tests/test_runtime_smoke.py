@@ -75,6 +75,7 @@ def rt_module(monkeypatch):
     mods = {
         "homeassistant": ha,
         "homeassistant.config_entries": types.ModuleType("homeassistant.config_entries"),
+        "homeassistant.const": types.ModuleType("homeassistant.const"),
         "homeassistant.core": types.ModuleType("homeassistant.core"),
         "homeassistant.helpers": types.ModuleType("homeassistant.helpers"),
         "homeassistant.helpers.event": types.ModuleType("homeassistant.helpers.event"),
@@ -82,6 +83,7 @@ def rt_module(monkeypatch):
         "homeassistant.util": types.ModuleType("homeassistant.util"),
     }
     mods["homeassistant.config_entries"].ConfigEntry = object
+    mods["homeassistant.const"].__version__ = "2026.11.0"
     core = mods["homeassistant.core"]
     core.Event = core.HomeAssistant = core.State = object
     ev = mods["homeassistant.helpers.event"]
@@ -340,3 +342,12 @@ def test_calc_disabled_without_inputs(rt_module):
     assert not rt.calc_enabled
     assert rt.thermal_mode == "meter"  # falls back safely
     assert rt.calc_diagnostics()["health"] == "inactive"
+
+
+def test_diagnostics_contain_versions_and_config(rt_module):
+    rt, _states, _clock = make_runtime(rt_module)
+    diag = rt.calc_diagnostics()
+    assert diag["integration_version"] not in ("", "unknown")
+    assert diag["ha_version"] == "2026.11.0"
+    assert diag["config"]["defrost"]["delta_t_k"] == 0.5
+    assert "entities" in diag["config"] and "limits" in diag["config"]
