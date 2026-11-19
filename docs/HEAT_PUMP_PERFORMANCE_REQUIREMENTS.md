@@ -2,7 +2,7 @@
 
 **Projekt:** [home-assistant-heat-pump-performance](https://github.com/vandecook/home-assistant-heat-pump-performance)  
 **Integrations-Domain:** `heat_pump_performance`  
-**Letzter bearbeiteter Versionsstand:** `0.1.14`
+**Letzter bearbeiteter Versionsstand:** `0.2.3`
 
 > Diese Liste dokumentiert den bisher vereinbarten Sollumfang. Ob sämtliche Anforderungen in v0.1.14 vollständig umgesetzt und getestet sind, ist separat anhand des Quellcodes und der Tests zu prüfen.
 

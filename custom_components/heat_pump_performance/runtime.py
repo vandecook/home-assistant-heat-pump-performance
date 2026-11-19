@@ -5,10 +5,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
+import json
 import logging
+from pathlib import Path
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import __version__ as HA_VERSION
 from homeassistant.core import Event, HomeAssistant, State
 from homeassistant.helpers.event import (
     async_call_later,
@@ -107,6 +110,16 @@ CALC_DEBOUNCE_S = 1.0
 SAVE_INTERVAL_S = 300.0
 
 # Config key of each self-calculation input role.
+def _integration_version() -> str:
+    """Version from the manifest, for the diagnostic output."""
+    try:
+        return str(json.loads((Path(__file__).parent / "manifest.json").read_text())["version"])
+    except (OSError, ValueError, KeyError):
+        return "unknown"
+
+
+INTEGRATION_VERSION = _integration_version()
+
 _ROLE_KEYS = {
     "flow": CONF_FLOW,
     "supply": CONF_SUPPLY_TEMP,
@@ -694,6 +707,32 @@ class HeatPumpPerformanceRuntime:
         self.state.calc_heat_since_meter = 0.0
         self.state.calc_window_start_ts = now.timestamp()
 
+    def _diagnostic_config(self) -> dict[str, Any]:
+        """Configured entities and thresholds, to make a diagnostic dump self-contained."""
+        data = self.data
+        return {
+            "entities": {
+                "flow": data.get(CONF_FLOW),
+                "supply": data.get(CONF_SUPPLY_TEMP),
+                "return": data.get(CONF_RETURN_TEMP),
+                "outdoor": data.get(CONF_OUTDOOR_TEMP),
+                "defrost_active": data.get(CONF_DEFROST_ACTIVE),
+                "thermal_energy": data.get(CONF_THERMAL_ENERGY),
+                "electrical_energy": data.get(CONF_ELECTRICAL_ENERGY),
+            },
+            "limits": {
+                "min_flow": data.get(CONF_MIN_FLOW),
+                "max_flow": data.get(CONF_MAX_FLOW),
+                "max_delta_t": data.get(CONF_MAX_DELTA_T),
+                "max_input_age_s": data.get(CONF_MAX_INPUT_AGE),
+            },
+            "defrost": {
+                "source": data.get(CONF_DEFROST_SOURCE, "calculated"),
+                "delta_t_k": data.get(CONF_DEFROST_DELTA_T, 0.5),
+                "min_duration_s": data.get(CONF_DEFROST_MIN_DURATION, 60),
+            },
+        }
+
     def calc_diagnostics(self) -> dict[str, Any]:
         """Diagnostic view of the self-calculation and all plausibility checks."""
         now_ts = dt_util.now().timestamp()
@@ -713,6 +752,9 @@ class HeatPumpPerformanceRuntime:
             extra_warnings=self._defrost_flag.warnings() if self.data.get(CONF_DEFROST_ACTIVE) else None,
         )
         return {
+            "integration_version": INTEGRATION_VERSION,
+            "ha_version": HA_VERSION,
+            "config": self._diagnostic_config(),
             "enabled": enabled,
             "thermal_mode": self.thermal_mode,
             "health": health,
