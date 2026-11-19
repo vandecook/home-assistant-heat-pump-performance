@@ -209,7 +209,10 @@ deiner Wärmepumpe ein.
 
 - `…_plausibility`: Zustand `inactive`, `ok`, `warning` oder `error`; alle Details
   (Zähler je Grund, Zähler gegen Berechnung, Abtauanteil, letzte Ablehnung) sind
-  Attribute.
+  Attribute. Die Attribute enthalten außerdem `integration_version`, `ha_version` und
+  einen `config`-Block (konfigurierte Entitäten, Grenzwerte, Abtau-Einstellungen).
+  Ein kopierter Dump ist damit eigenständig, wenn du Hilfe suchst oder einen Fehler
+  meldest.
 - `…_input_diagnostics`: jeder konfigurierte Eingang mit Rohzustand, Einheit,
   normiertem Wert, vorherigem Wert und Delta, Summen je Zeitraum, Backfill-Status
   und einem `calculation`-Block mit effektiver Wärmeenergie, berechneter Wärme und
@@ -353,6 +356,12 @@ ein Teiljahr, das zum Zeitpunkt des Resets beginnt.
 
 ## Änderungsverlauf
 
+- **0.2.3**: Die Diagnose-Attribute von `…_plausibility` enthalten jetzt
+  `integration_version`, `ha_version` und einen `config`-Block (konfigurierte
+  Entitäten, Grenzwerte, Abtau-Einstellungen).
+- **0.2.2**: Standard-Mindestdauer der Abtauerkennung 60 s; Toleranz für ein spätes
+  WP-Signal; neue Einstellung, um Abtauanzahl, -dauer und Verlustbuchung aus dem
+  Signal der Wärmepumpe zu nehmen.
 - **0.2.0**: Selbstberechnete Wärme aus Durchfluss und Temperaturen,
   vorzeichenbehaftete Leistung und Abtauerkennung, Wärme-Modi,
   Plausibilitätsprüfungen mit Diagnose-Entität, Brutto-COP, Aufteilung Heizen /
