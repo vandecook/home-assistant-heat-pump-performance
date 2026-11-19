@@ -2,7 +2,7 @@
 
 [English](README.md) | **Deutsch**
 
-**Aktuelle Version: 0.2.0**
+**Aktuelle Version: 0.2.3**
 
 Repository: https://github.com/vandecook/home-assistant-heat-pump-performance
 
